@@ -1,3 +1,4 @@
+//Used by AI to indicate completion of a run
 
 public class DoneRamPort implements MemoryPort {
 	private byte val;

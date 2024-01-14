@@ -1,3 +1,4 @@
+//Can redirect to 2 different locations
 
 public class SwitchableRedirect implements MemoryPort {
 	private Memory mem;

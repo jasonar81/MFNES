@@ -1,3 +1,4 @@
+//Used by mappers
 
 public class Latch0Port extends TwoStateMemoryPort {
 	private Memory mem;

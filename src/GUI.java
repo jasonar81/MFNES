@@ -1,3 +1,5 @@
+//The interface for controller, display, and audio providers
+
 import java.util.ArrayList;
 
 public interface GUI extends Runnable {

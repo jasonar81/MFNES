@@ -1,3 +1,5 @@
+//Ye old 6502 without BCD support
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;

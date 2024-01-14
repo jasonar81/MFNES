@@ -1,3 +1,4 @@
+//Used by AI
 
 public class ControllerEvent {
 	private long cycle;

@@ -1,3 +1,4 @@
+//Memory address that does nothing
 
 public class BlackHole implements MemoryPort {
 

@@ -1,4 +1,6 @@
 
+//Memory address that is backed by 2 bytes of storage and can be switched between them
+
 public class TwoStateMemoryPort implements MemoryPort {
 	Memory ppuMem;
 	int flag;

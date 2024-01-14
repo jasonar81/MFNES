@@ -1,3 +1,5 @@
+//GUI implementation for neural net AIs
+
 import java.awt.event.KeyEvent;
 
 public class NetGui extends DefaultGUI {

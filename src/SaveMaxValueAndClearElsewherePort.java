@@ -1,3 +1,4 @@
+//Another wacky AI port
 
 public class SaveMaxValueAndClearElsewherePort implements MemoryPort, ClearablePort {
 	private byte val;

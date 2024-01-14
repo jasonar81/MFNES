@@ -1,3 +1,4 @@
+//Used by AI to report a player death
 
 public class DeathPort implements MemoryPort {
 	private byte val;

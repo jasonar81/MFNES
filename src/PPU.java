@@ -1,3 +1,6 @@
+//The Picture Processing Unit
+//Generate the data from every frame in the video and sends it to the GUI
+
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 

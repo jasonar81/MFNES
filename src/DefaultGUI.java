@@ -1,3 +1,5 @@
+//The default controller, display, and audio provider
+
 import java.awt.Color;
 import java.awt.Graphics;
 import java.awt.GraphicsEnvironment;

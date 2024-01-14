@@ -1,3 +1,8 @@
+//Clock for syncing PPU and CPU
+//The APU isn't synced as tightly
+//It can run multiple cycles at once if it is behind
+//The CPU and PPU never wait for the APU
+//Whereas they both make sure they never get too far ahead of each other
 
 public class Clock {
 	public static double periodNanos = 1000000000.0 / 5369317.5;

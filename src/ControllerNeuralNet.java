@@ -1,3 +1,5 @@
+//Neural net for generating controller events from memory or pixel data
+
 import java.util.ArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 

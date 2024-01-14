@@ -1,3 +1,4 @@
+//Debugging memory port that allows you to see/log writes
 
 public class MonitorMemoryPort implements MemoryPort {
 	private byte val;

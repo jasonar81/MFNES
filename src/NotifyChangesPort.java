@@ -1,3 +1,4 @@
+//Port used by AI
 
 public class NotifyChangesPort implements MemoryPort {
 	private byte val;

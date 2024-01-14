@@ -1,6 +1,8 @@
 import java.io.IOException;
 import java.io.RandomAccessFile;
 
+//Use for cartridges that have save abilities
+
 public class BatteryBackedRamPort implements MemoryPort {
 	RandomAccessFile raf;
 	int offset;

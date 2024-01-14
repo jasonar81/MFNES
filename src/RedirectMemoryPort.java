@@ -1,3 +1,4 @@
+//Memory port that just redirects elsewhere
 
 public class RedirectMemoryPort implements MemoryPort {
 	private Memory mem;

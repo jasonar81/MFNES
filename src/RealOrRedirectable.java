@@ -1,3 +1,4 @@
+//Memory port that has backing storage but can be switched to redirect while retaining data
 
 public class RealOrRedirectable implements MemoryPort {
 	private Memory mem;

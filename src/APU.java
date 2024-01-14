@@ -1,3 +1,9 @@
+//The Audio Processing Unit
+//Made of 5 channels
+//Two pulse channels
+//One triange channel
+//One noise channel
+//One delta coded PCM channel
 
 public class APU implements Runnable {
 	private CPU cpu;

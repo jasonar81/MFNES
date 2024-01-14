@@ -1,3 +1,5 @@
+//Wacky memory port used by AI that can report progress and clear
+//the max values in other ports
 
 public class ClearElsewhereMaxValuePort implements MemoryPort {
 	private byte val;

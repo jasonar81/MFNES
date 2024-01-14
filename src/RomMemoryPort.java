@@ -1,3 +1,4 @@
+//Read only memory address
 
 public class RomMemoryPort implements MemoryPort {
 	private byte val;

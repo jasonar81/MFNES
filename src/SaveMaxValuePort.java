@@ -1,3 +1,4 @@
+//Used by AI to see max value of memory address
 
 public class SaveMaxValuePort implements MemoryPort, ClearablePort {
 	private byte val;

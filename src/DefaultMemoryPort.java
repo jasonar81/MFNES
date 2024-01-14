@@ -1,3 +1,4 @@
+//The default implementation of a memory address
 
 public class DefaultMemoryPort implements MemoryPort {
 	private byte val;

@@ -1,3 +1,4 @@
+//Interface for AI agents
 
 public interface AiAgent {
 	public void setDone(long totalTime);

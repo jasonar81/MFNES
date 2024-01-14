@@ -1,3 +1,4 @@
+//Used by AI, does what it says it does
 
 public class TrackSumOfSubtractionsPort implements MemoryPort {
 	private byte val;
