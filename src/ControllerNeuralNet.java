@@ -17,6 +17,14 @@ public class ControllerNeuralNet {
 	private boolean memoryBased;
 	private int displaySize = 280 * 240;
 	private GUI gui;
+	private long previousCycle = 0;
+	private int previousState = 0;
+	
+	public void reset()
+	{
+		previousCycle = 0;
+		previousState = 0;
+	}
 	
 	public ControllerNeuralNet(int layerSize, int numLayers, boolean init, boolean flag)
 	{
@@ -215,8 +223,13 @@ public class ControllerNeuralNet {
 		}
 	}
 	
-	public int getButtonState()
+	public int getButtonState(long cycle)
 	{
+		if (cycle - previousCycle < 400000)
+		{
+			return previousState;
+		}
+		
 		run();
 		int state = 0;
 		if (output[0] >= 0)
@@ -249,6 +262,8 @@ public class ControllerNeuralNet {
 			state |= 0x04;
 		}
 		
+		previousState = state;
+		previousCycle = cycle;
 		return state;
 	}
 }

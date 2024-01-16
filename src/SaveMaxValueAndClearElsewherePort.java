@@ -51,6 +51,7 @@ public class SaveMaxValueAndClearElsewherePort implements MemoryPort, ClearableP
 	public void clearMaxValue()
 	{
 		maxValue = 0;
+		other.clearMaxValue();
 	}
 	
 }

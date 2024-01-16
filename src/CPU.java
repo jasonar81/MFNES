@@ -3152,23 +3152,6 @@ public class CPU implements Runnable {
 	
 	private void halt()
 	{
-		synchronized(System.out) 
-		{
-			System.out.println("CPU halted");
-		}
-		
-		while (true) 
-		{
-			if (reset.get())
-			{
-				break;
-			}
-			
-			if (terminate.get())
-			{
-				return;
-			}
-		}
 	}
 	
 	private void halt_print()

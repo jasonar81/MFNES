@@ -13,6 +13,7 @@ public class Main {
 	private static GUI gui;
 	private static Thread guiThread;
 	private static String previousCommand = "";
+	private static boolean on = false;
 	
 	public static void main(String[] args)
 	{
@@ -289,18 +290,22 @@ public class Main {
 	
 	private static void off()
 	{
-		apu.terminate();
-		cpu.terminate();
-		ppu.terminate();
-		gui.terminate();
-		
-		try
+		if (on)
 		{
-			Thread.sleep(1000);
+			on = false;
+			apu.terminate();
+			cpu.terminate();
+			ppu.terminate();
+			gui.terminate();
+			
+			try
+			{
+				Thread.sleep(1000);
+			}
+			catch(Exception e) {}
+			
+			initialSetup();
 		}
-		catch(Exception e) {}
-		
-		initialSetup();
 	}
 	
 	private static void run()
@@ -312,17 +317,21 @@ public class Main {
 	
 	private static void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
-		cpuThread = new Thread(cpu);
-		cpuThread.setPriority(10);
-		apuThread = new Thread(apu);
-		apuThread.setPriority(10);
-		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
-		cpuThread.start();
+		if (!on)
+		{
+			on = true;
+			ppuThread = new Thread(ppu);
+			ppuThread.setPriority(10);
+			cpuThread = new Thread(cpu);
+			cpuThread.setPriority(10);
+			apuThread = new Thread(apu);
+			apuThread.setPriority(10);
+			cpu.debugHold(true);
+			ppu.debugHold(true);
+			ppuThread.start();
+			apuThread.start();
+			cpuThread.start();
+		}
 	}
 	
 	private static void initialSetup()

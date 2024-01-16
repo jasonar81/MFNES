@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class ContraAi3 implements AiAgent {
+public class BubbleBobbleAi3 implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -21,29 +21,26 @@ public class ContraAi3 implements AiAgent {
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
-	private volatile boolean done;
+	private volatile boolean done = false;
 	private volatile boolean startedDone;
-	private volatile ArrayList<Long> deaths = new ArrayList<Long>();
 	private volatile long score;
+	private volatile int currentLevel = 1;
+	private volatile long previousScore = 0;
+	private volatile long previousFinishTime = 0;
 	
-	private static ContraAi3 instance;
+	private static BubbleBobbleAi3 instance;
 	
-	private long firstUsableCycle = 62407559;
-	private volatile long previousProgressCycle;
-	private volatile long previousProgressScore;
-	private volatile long remainingLives;
-	private volatile long previousRemainingLives;
-	private volatile long previousProgressShots;
+	private long firstUsableCycle = 52853029;
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 40000;
+	private long numControllerRequests = 200000;
 	private int layerSize = 512;
 	private int numLayers = 3;
 	
 	public static void main(String[] args)
 	{
-		instance = new ContraAi3();
+		instance = new BubbleBobbleAi3();
 		instance.main();
 	}
 	
@@ -61,7 +58,7 @@ public class ContraAi3 implements AiAgent {
 		}
 		
 		setup();
-		load("contra.nes");
+		load("bubble_bobble.nes", "sav");
 		makeModifications();
 		net.reset();
 		net.setGui(gui);
@@ -93,7 +90,7 @@ public class ContraAi3 implements AiAgent {
 			}
 			
 			setup();
-			load("contra.nes");
+			load("bubble_bobble.nes", "sav");
 			makeModifications();
 			net.reset();
 			net.setGui(gui);
@@ -131,7 +128,7 @@ public class ContraAi3 implements AiAgent {
 	{
 		try
 		{
-			FileWriter file = new FileWriter("contra_pixels.net");
+			FileWriter file = new FileWriter("bubble_bobble_pixels.net");
 			PrintWriter out = new PrintWriter(file);
 			out.println(layerSize);
 			out.println(numLayers);
@@ -155,7 +152,7 @@ public class ContraAi3 implements AiAgent {
 	{
 		try
 		{
-			File file = new File("contra_pixels.net");
+			File file = new File("bubble_bobble_pixels.net");
 			if (!file.exists())
 			{
 				return false;
@@ -190,24 +187,22 @@ public class ContraAi3 implements AiAgent {
 	
 	private void setup()
 	{
+		previousFinishTime = firstUsableCycle;
+		previousScore = 0;
+		currentLevel = 1;
 		screenScores = new ArrayList<Long>();
 		score = 0;
-		previousProgressCycle = 0;
-		previousProgressScore = 0;
-		remainingLives = 65536;
-		previousRemainingLives = 65536;
-		previousProgressShots = 0;
 		done = false;
 		startedDone = false;
 		
+		long[] startOnOffTimes = new long[] {3551418, 4298614, 15538630, 16164028, 17682829, 18130489,
+				20452414, 20834989, 22643841, 23248948, 26187211, 27332024, 38767736, 38767882,
+				45561100, 46095082};
 		clock = new Clock();
-		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
 		gui = new NetGui(numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
-		deaths.clear();
-		deaths = deaths;
 		
 		ppuMem = new Memory(Memory.PPU, null, gui);
 		ppu = new PPU(clock, ppuMem, gui);
@@ -236,13 +231,13 @@ public class ContraAi3 implements AiAgent {
 		catch(Exception e) {}
 	}
 
-	private void load(String filename)
+	private void load(String filename, String saveFilename)
 	{
 		Cartridge cart = Cartridge.loadCart(filename);
 		
 		if (cart != null)
 		{
-			cpu.setupCart(cart);
+			cpu.setupCart(cart, saveFilename);
 			ppu.setupCart(cart);
 		}
 	}
@@ -254,13 +249,24 @@ public class ContraAi3 implements AiAgent {
 		ppu.debugHold(false);
 	}
 	
+	private void printResults()
+	{
+		System.out.println("Level = " + screenScores.size());
+		System.out.println("Game score = " + gameScore());
+	}
+	
+	private int getLevel()
+	{
+		return ((SaveAndUpdateMaxValuePort)cpu.getMem().getLayout()[0x401]).getMaxValue();
+	}
+	
 	private void on()
 	{
 		ppuThread = new Thread(ppu);
 		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread(apu);
+		apuThread = new Thread (apu);
 		apuThread.setPriority(10);
 		cpu.debugHold(true);
 		ppu.debugHold(true);
@@ -269,60 +275,25 @@ public class ContraAi3 implements AiAgent {
 		cpuThread.start();
 	}
 	
-	private void printResults()
-	{
-		System.out.println("Game completions = " + cpu.getMem().read(0x31));
-		System.out.println("Level = " + cpu.getMem().read(0x30));
-		System.out.println("Screen in level = " + ((SaveMaxValueAndClearElsewherePort)cpu.getMem().getLayout()[0x64]).getMaxValue());
-		System.out.println("Distance into screen = " + ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue());
-		System.out.println("Score = " + getGameScore());
-	}
-	
 	private void makeModifications()
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x34] = new RomMemoryPort((byte)0); //Fix the randomizer value
-		//cpu.getMem().getLayout()[0x32] = new RomMemoryPort((byte)63); //Always report back 63 lives remaining
-		cpu.getMem().getLayout()[0x3a] = new DoneRamPort((byte)2, this, clock); //When continues decrements to 2, call it a wrap
-		cpu.getMem().getLayout()[0x65] = new SaveMaxValuePort(); //Distance into current screen
-		cpu.getMem().getLayout()[0x64] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x65], false, true, this, clock); //Screen number in level
-		cpu.getMem().getLayout()[0x30] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x64], false, true, this, clock); //Level
-		cpu.getMem().getLayout()[0xb4] = new DeathPort((byte)1, this, clock); //Detect a death
+		cpu.getMem().getLayout()[0x2e] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x401] = new SaveAndUpdateMaxValuePort(this, clock); //Level (0 doesn't count)
 	}
 	
 	public void setDone(long totalTime)
 	{
 		if (!startedDone && !done)
 		{
+			pause();
+			System.out.println("Done");
 			startedDone = true;
-			long scoreDelta = getGameScore() - previousProgressScore;
-			System.out.println("There were " + deaths.size() + " deaths");
-			
-			long offset = getScreenOffset();
-			offset *= (256 * 256);
-			scoreDelta *= 256;
-			long shotsDelta = getTotalShots() - previousProgressShots;
-			score += (offset + scoreDelta + shotsDelta);
-			screenScores.add(offset + scoreDelta + shotsDelta);
-			screenScores = screenScores;
-			System.out.println("Screen scores size is " + screenScores.size());
-			System.out.println("Added " + (offset + scoreDelta) + " to score");
+			long screenScore = partialScore();
+			screenScores.add(screenScore);
+			score += screenScore;
 			done = true;
-		}
-	}
-	
-	public synchronized void setDeath(long cycle)
-	{
-		pause();
-		deaths.add(cycle);
-		deaths = deaths;
-		
-		--remainingLives;
-		cont();
-		if (remainingLives == 0)
-		{
-			setDone(clock.getPpuExpectedCycle());
 		}
 	}
 	
@@ -336,55 +307,6 @@ public class ContraAi3 implements AiAgent {
 	{
 		cpu.debugHold(false);
 		ppu.debugHold(false);
-	}
-	
-	public synchronized void progress(long cycle)
-	{
-		long currentScore = getGameScore();
-		pause();
-		long lives = 65536 - (previousRemainingLives - remainingLives);
-		System.out.println("Lives lost = " + (previousRemainingLives - remainingLives));
-		lives *= (256L * 256L * 256L * 256L);
-		long timeScore = (long)(255.0 - ((cycle - previousProgressCycle) / 5369317.5));
-		System.out.println("Took " + ((cycle - previousProgressCycle) / 5369317.5) + " seconds");
-		if (timeScore < 0)
-		{
-			timeScore = 0;
-		}
-		timeScore *= (256L * 256L * 256L);
-		long offset = 255;
-		offset *= (256 * 256);
-		long scoreDelta = currentScore - previousProgressScore;
-		System.out.println("Score " + scoreDelta + " points");
-		scoreDelta *= 256;
-		long shotsDelta = getTotalShots() - previousProgressShots;
-		System.out.println("Number of shots = " + shotsDelta);
-		if (shotsDelta > 255)
-		{
-			shotsDelta = 255;
-		}
-		
-		previousProgressCycle = cycle;
-		previousProgressScore = currentScore;
-		previousRemainingLives = remainingLives;
-		previousProgressShots = getTotalShots();
-		score += (lives + timeScore + offset + scoreDelta + shotsDelta);
-		screenScores.add(lives + timeScore + offset + scoreDelta + shotsDelta);
-		screenScores = screenScores;
-		System.out.println("Screen scores size is " + screenScores.size());
-		System.out.println("Added " + (lives + timeScore + offset + scoreDelta) + " to score");
-		
-		cont();
-	}
-	
-	private int getGameScore()
-	{
-		return (cpu.getMem().read(0x07e3) << 8) + cpu.getMem().read(0x07e2);
-	}
-	
-	private long getScreenOffset()
-	{
-		return ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue();
 	}
 	
 	private boolean processScreenResults()
@@ -412,8 +334,122 @@ public class ContraAi3 implements AiAgent {
 		return retval;
 	}
 	
-	private long getTotalShots()
+	public synchronized void progress(long cycle)
 	{
-		return gui.getTotalBPresses();
+		pause();
+		
+		//We got pinged because of a level change or loss of life
+		if (cycle >= firstUsableCycle)
+		{
+			int level = getLevel();
+			if (level > currentLevel)
+			{
+				//new level 
+				System.out.println("Finished level");
+				currentLevel = level;
+				System.out.println("Level is now " + level);
+				long screenScore = finishedScreenScore(cycle);
+				screenScores.add(screenScore);
+				score += screenScore;
+			}
+			else if (cpu.getMem().getLayout()[0x2e].read() == 0)
+			{
+				setDone(cycle);
+			}
+		}
+		
+		cont();
+	}
+	
+	private long finishedScreenScore(long cycle)
+	{
+		long seconds = (long)((cycle - previousFinishTime) / 5369317.5);
+		System.out.println("Level took " + seconds + "s");
+		if (seconds > 255)
+		{
+			seconds = 255;
+		}
+		
+		seconds = 255 - seconds;
+		seconds <<= 24;
+		long lives = cpu.getMem().read(0x2e);
+		System.out.println("Remaining lives = " + lives);
+		lives <<= 32;
+		
+		long gameScore = gameScore();
+		long delta = gameScore - previousScore;
+		if (delta < 0)
+		{
+			delta = 0;
+		}
+		
+		System.out.println("Score in this level = " + delta);
+		previousScore = gameScore;
+		previousFinishTime = cycle;
+		return lives + seconds + delta;
+	}
+	
+	private long partialScore()
+	{
+		System.out.println("Processing partial screen");
+		long seconds = 0;
+		long lives = 0;
+		
+		long gameScore = gameScore();
+		long delta = gameScore - previousScore;
+		if (delta < 0)
+		{
+			delta = 0;
+		}
+		
+		System.out.println("Score in this level = " + delta);
+		return lives + seconds + delta;
+	}
+	
+	private long gameScore()
+	{
+		long retval = 0;
+		int val = cpu.getMem().getLayout()[0x44a].read();
+		if (val != 0x27)
+		{
+			retval += val;
+		}
+		
+		val = cpu.getMem().getLayout()[0x449].read();
+		if (val != 0x27)
+		{
+			retval += (val * 10);
+		}
+		
+		val = cpu.getMem().getLayout()[0x448].read();
+		if (val != 0x27)
+		{
+			retval += (val * 100);
+		}
+		
+		val = cpu.getMem().getLayout()[0x447].read();
+		if (val != 0x27)
+		{
+			retval += (val * 1000);
+		}
+		
+		val = cpu.getMem().getLayout()[0x446].read();
+		if (val != 0x27)
+		{
+			retval += (val * 10000);
+		}
+		
+		val = cpu.getMem().getLayout()[0x445].read();
+		if (val != 0x27)
+		{
+			retval += (val * 100000);
+		}
+		
+		return retval;
+	}
+
+	@Override
+	public void setDeath(long cycle) {
+		//Easier just to handle in progress()
 	}
 }

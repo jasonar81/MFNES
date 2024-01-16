@@ -61,7 +61,7 @@ public class ContraAi implements AiAgent {
 			setup();
 			load("contra.nes");
 			makeModifications();
-			ArrayList<ControllerEvent> eventList = getEventList("contra_best.rec");
+			ArrayList<ControllerEvent> eventList = getEventList("contra.rec");
 			eventList = reduceEvents(eventList);
 			eventList = addRandomEvents(eventList);
 			eventList = cleanEvents(eventList);
@@ -81,7 +81,7 @@ public class ContraAi implements AiAgent {
 			{
 				highScore = score;
 				highDeaths = deaths;
-				writeCurrentBestRecording(eventList, totalTime, "contra_best.rec");
+				writeCurrentBestRecording(eventList, totalTime, "contra.rec");
 				System.out.println("New high score!");
 			}
 			
@@ -97,7 +97,7 @@ public class ContraAi implements AiAgent {
 				load("contra.nes");
 				makeModifications();
 			
-				eventList = getEventList("contra_best.rec");
+				eventList = getEventList("contra.rec");
 				eventList = modifyEventList(eventList);
 				eventList = addRandomEvents(eventList);
 				eventList = cleanEvents(eventList);
@@ -118,7 +118,7 @@ public class ContraAi implements AiAgent {
 				{
 					highScore = score;
 					highDeaths = deaths;
-					writeCurrentBestRecording(eventList, totalTime, "contra_best.rec");
+					writeCurrentBestRecording(eventList, totalTime, "contra.rec");
 					System.out.println("New high score!");
 				}
 			
@@ -153,7 +153,7 @@ public class ContraAi implements AiAgent {
 			{
 				highScore = score;
 				highDeaths = deaths;
-				writeCurrentBestRecording(eventList, totalTime, "contra_best.rec");
+				writeCurrentBestRecording(eventList, totalTime, "contra.rec");
 				System.out.println("New high score!");
 			}
 
@@ -187,7 +187,7 @@ public class ContraAi implements AiAgent {
 			{
 				highScore = score;
 				highDeaths = deaths;
-				writeCurrentBestRecording(eventList, totalTime, "contra_best.rec");
+				writeCurrentBestRecording(eventList, totalTime, "contra.rec");
 				System.out.println("New high score!");
 			}
 
@@ -693,7 +693,7 @@ public class ContraAi implements AiAgent {
 		previousRemainingLives = remainingLives;
 		previousProgressShots = getTotalShots();
 		score += (lives + timeScore + offset + scoreDelta + shotsDelta);
-		screenScores.add(lives + timeScore + offset + scoreDelta);
+		screenScores.add(lives + timeScore + offset + scoreDelta + shotsDelta);
 		screenScores = screenScores;
 		System.out.println("Screen scores size is " + screenScores.size());
 		screenEndTimes.add(cycle);

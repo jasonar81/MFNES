@@ -37,8 +37,8 @@ public class ContraAi2 implements AiAgent {
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 10000;
-	private int layerSize = 128;
+	private long numControllerRequests = 40000;
+	private int layerSize = 1024;
 	private int numLayers = 3;
 	
 	public static void main(String[] args)
@@ -60,9 +60,10 @@ public class ContraAi2 implements AiAgent {
 			System.out.println("Successfully load a " + layerSize + "x" + numLayers + " net with up to " + numControllerRequests + " events");
 		}
 		
-		setup(numControllerRequests);
+		setup();
 		load("contra.nes");
 		makeModifications();
+		net.reset();
 		net.setCpuMem(cpuMem);
 		run();
 		
@@ -91,9 +92,10 @@ public class ContraAi2 implements AiAgent {
 				net.updateParameters();
 			}
 			
-			setup(numControllerRequests);
+			setup();
 			load("contra.nes");
 			makeModifications();
+			net.reset();
 			net.setCpuMem(cpuMem);
 			run();
 			
@@ -110,7 +112,7 @@ public class ContraAi2 implements AiAgent {
 				highScore = score;
 				System.out.println("New high score!");
 				saveNet();
-				if (numControllerRequests < 3000000)
+				if (numControllerRequests < 300000000)
 				{
 					numControllerRequests *= 2;
 				}
@@ -186,7 +188,7 @@ public class ContraAi2 implements AiAgent {
 		return true;
 	}
 	
-	private void setup(long numControllerRequests)
+	private void setup()
 	{
 		screenScores = new ArrayList<Long>();
 		score = 0;
@@ -197,14 +199,16 @@ public class ContraAi2 implements AiAgent {
 		previousProgressShots = 0;
 		done = false;
 		startedDone = false;
-		gui = new NetGui(numControllerRequests, firstUsableCycle, net);
+		
+		clock = new Clock();
+		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
+		gui = new NetGui(numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
 		deaths.clear();
 		deaths = deaths;
 		
-		clock = new Clock();
 		ppuMem = new Memory(Memory.PPU, null, gui);
 		ppu = new PPU(clock, ppuMem, gui);
 		cpuMem = new Memory(Memory.CPU, ppu, gui);
@@ -365,7 +369,7 @@ public class ContraAi2 implements AiAgent {
 		previousRemainingLives = remainingLives;
 		previousProgressShots = getTotalShots();
 		score += (lives + timeScore + offset + scoreDelta + shotsDelta);
-		screenScores.add(lives + timeScore + offset + scoreDelta);
+		screenScores.add(lives + timeScore + offset + scoreDelta + shotsDelta);
 		screenScores = screenScores;
 		System.out.println("Screen scores size is " + screenScores.size());
 		System.out.println("Added " + (lives + timeScore + offset + scoreDelta) + " to score");

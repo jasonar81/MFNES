@@ -9,12 +9,16 @@ public class NetGui extends DefaultGUI {
 	private int requestsWithinState = 0;
 	private long requests = 0;
 	private ControllerNeuralNet cnn;
+	private long[] startOnOffTimes;
+	Clock clock;
 	
-	public NetGui(long numControllerRequests, long firstUsableCycle, ControllerNeuralNet cnn)
+	public NetGui(long numControllerRequests, long firstUsableCycle, ControllerNeuralNet cnn, long[] startOnOffTimes, Clock clock)
 	{
 		this.numControllerRequests = numControllerRequests;
 		this.firstUsableCycle = firstUsableCycle;
 		this.cnn = cnn;
+		this.startOnOffTimes = startOnOffTimes;
+		this.clock = clock;
 	}
 	
 	@Override
@@ -37,7 +41,7 @@ public class NetGui extends DefaultGUI {
 		
 		if (Utils.getBit(requestsWithinState, 7))
 		{
-			state = cnn.getButtonState();
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
 			requestsWithinState = 0;
 		}
 		
@@ -60,7 +64,7 @@ public class NetGui extends DefaultGUI {
 		
 		if (Utils.getBit(requestsWithinState, 6))
 		{
-			state = cnn.getButtonState();
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
 			requestsWithinState = 0;
 		}
 		
@@ -77,10 +81,13 @@ public class NetGui extends DefaultGUI {
 	@Override
 	public boolean getStart() {
 		long cycle = clock.getPpuExpectedCycle();
-		if ((cycle >= 11426048 && cycle < 12714767) ||
-				(cycle >= 26833377 && cycle < 28715336))
+		
+		for (int i = 0; i < startOnOffTimes.length; i += 2)
 		{
-			return true;
+			if (cycle >= startOnOffTimes[i] && cycle < startOnOffTimes[i+1])
+			{
+				return true;
+			}
 		}
 		
 		return false;
@@ -100,7 +107,7 @@ public class NetGui extends DefaultGUI {
 		
 		if (Utils.getBit(requestsWithinState, 5))
 		{
-			state = cnn.getButtonState();
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
 			requestsWithinState = 0;
 		}
 		
@@ -123,7 +130,7 @@ public class NetGui extends DefaultGUI {
 		
 		if (Utils.getBit(requestsWithinState, 4))
 		{
-			state = cnn.getButtonState();
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
 			requestsWithinState = 0;
 		}
 		
@@ -146,7 +153,7 @@ public class NetGui extends DefaultGUI {
 		
 		if (Utils.getBit(requestsWithinState, 3))
 		{
-			state = cnn.getButtonState();
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
 			requestsWithinState = 0;
 		}
 		
@@ -169,7 +176,7 @@ public class NetGui extends DefaultGUI {
 		
 		if (Utils.getBit(requestsWithinState, 2))
 		{
-			state = cnn.getButtonState();
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
 			requestsWithinState = 0;
 		}
 		

@@ -291,9 +291,9 @@ public class PunchOutAi implements AiAgent {
 	{
 		if (!startedDone && !done)
 		{
+			pause();
 			System.out.println("Done");
 			//Events list ran out
-			pause();
 			startedDone = true;
 			this.totalTime = totalTime;
 			long screenScore = partialScore(knockOut);
@@ -407,34 +407,6 @@ public class PunchOutAi implements AiAgent {
 		return false;
 	}
 	
-	private int deleteRange(long start, long end, ArrayList<ControllerEvent> events)
-	{
-		ArrayList<ControllerEvent> temp = new ArrayList<ControllerEvent>();
-		int num = 0;
-		
-		for (ControllerEvent event : events)
-		{
-			if (event.getCycle() < start)
-			{
-				temp.add(event);
-			} else if (event.getCycle() > end)
-			{
-				temp.add(new ControllerEvent(event.getCycle() - (end - start), event.getDown(), event.getCode()));
-			} else
-			{
-				++num;
-			}
-		}
-		
-		events.clear();
-		for (ControllerEvent event : temp)
-		{
-			events.add(event);
-		}
-		
-		return num;
-	}
-	
 	private ArrayList<ControllerEvent> addEvent(long cycle, boolean pressed, int keyCode, ArrayList<ControllerEvent> events)
 	{
 		//System.out.println("Adding an event");
@@ -462,22 +434,11 @@ public class PunchOutAi implements AiAgent {
 		int numMods = (int)(totalModfiableTime / 500000);
 		for (int i = 0; i < numMods;)
 		{
-			int modType = Math.abs(ThreadLocalRandom.current().nextInt()) % 4;
+			int modType = Math.abs(ThreadLocalRandom.current().nextInt()) % 3;
 			long offset = (long)(ThreadLocalRandom.current().nextDouble() * totalModfiableTime);
 			long cycle = firstUsableCycle + offset;
 			
-			if (modType == 3)
-			{
-				long offset2 = (long)(ThreadLocalRandom.current().nextDouble() * totalModfiableTime);
-				long cycle2 = firstUsableCycle + offset2;
-				if (cycle2 <= cycle)
-				{
-					continue;
-				}
-				
-				i += deleteRange(cycle, cycle2, old);
-			}
-			else if (modType == 2)
+			if (modType == 2)
 			{
 				if (deleteNextEventAfter(cycle, old))
 				{

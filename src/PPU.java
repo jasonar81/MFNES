@@ -711,7 +711,7 @@ public class PPU implements Runnable {
 		if (activeSprite != 0x00000000ffffffffL)
 		{
 			int xMin = (int)(activeSprite & 0xff);
-			int xMax = (xMin + 7) & 0xff;
+			int xMax = (xMin + 7)
 			
 			if (xMin < xMax)
 			{
