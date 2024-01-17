@@ -250,6 +250,11 @@ public class CPU implements Runnable {
 					Thread.sleep(1);
 				}
 				catch(Exception e) {}
+				
+				if (terminate.get())
+				{
+					return;
+				}
 			}
 			
 			if (reset.get())

@@ -29,11 +29,11 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 public class DefaultGUI implements GUI, ComponentListener, KeyListener {
-	private JFrame frame;
-	private volatile BufferedImage img;
-	private volatile int[] imgData = new int[280 * 240];
-	private JPanel panel;
-	private BufferStrategy strategy;
+	protected JFrame frame;
+	protected volatile BufferedImage img;
+	protected volatile int[] imgData = new int[280 * 240];
+	protected JPanel panel;
+	protected BufferStrategy strategy;
 	private AtomicInteger width;
 	private AtomicInteger height;
 	private AtomicInteger x;
@@ -51,7 +51,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	private volatile boolean b = false;
 	private volatile long totalBPresses = 0;
 	
-	private SourceDataLine audio;
+	protected SourceDataLine audio;
 	private byte[] audioBuffer = new byte[8192];
 	private boolean buffering = true;
 	private int bufferingIndex = 0;
@@ -66,7 +66,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	private long cycleOffset;
 	protected Clock clock;
 	
-	private volatile boolean terminate = false;
+	protected volatile boolean terminate = false;
 	protected AiAgent agent = null;
 	private long maxWait = 0;
 	

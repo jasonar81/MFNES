@@ -31,7 +31,7 @@ public class PunchOutAi2 implements AiAgent {
 	
 	private static PunchOutAi2 instance;
 	
-	private long firstUsableCycle = 62825331;
+	private long firstUsableCycle = 62856095;
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
@@ -50,7 +50,7 @@ public class PunchOutAi2 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(layerSize, numLayers, true);
+			 net = new ControllerNeuralNet(true, layerSize, numLayers, true);
 		}
 		else
 		{
@@ -166,7 +166,7 @@ public class PunchOutAi2 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(layerSize, numLayers, false);
+			net = new ControllerNeuralNet(true, layerSize, numLayers, false);
 			
 			int paramNum = 0;
 			while (in.hasNextLine() && net.hasMoreSetup())
@@ -196,14 +196,13 @@ public class PunchOutAi2 implements AiAgent {
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {22469198, 24028312, 61537237, 62825330};
+		long[] startOnOffTimes = new long[] {61779177, 62856094};
 		clock = new Clock();
-		gui = new NetGui(numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new NetGui(true, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
-		clock = new Clock();
 		ppuMem = new Memory(Memory.PPU, null, gui);
 		ppu = new PPU(clock, ppuMem, gui);
 		cpuMem = new Memory(Memory.CPU, ppu, gui);

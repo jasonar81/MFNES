@@ -49,7 +49,7 @@ public class SmbAi3 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(layerSize, numLayers, true, true);
+			 net = new ControllerNeuralNet(false, layerSize, numLayers, true, true);
 		}
 		else
 		{
@@ -165,7 +165,7 @@ public class SmbAi3 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(layerSize, numLayers, false, true);
+			net = new ControllerNeuralNet(false, layerSize, numLayers, false, true);
 			
 			int paramNum = 0;
 			while (in.hasNextLine() && net.hasMoreSetup())
@@ -196,7 +196,7 @@ public class SmbAi3 implements AiAgent {
 		
 		long[] startOnOffTimes = new long[] {16103188, 16979809, 24542115, 25377918};
 		clock = new Clock();
-		gui = new NetGui(numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();

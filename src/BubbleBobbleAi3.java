@@ -49,7 +49,7 @@ public class BubbleBobbleAi3 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(layerSize, numLayers, true, true);
+			 net = new ControllerNeuralNet(false, layerSize, numLayers, true, true);
 		}
 		else
 		{
@@ -165,7 +165,7 @@ public class BubbleBobbleAi3 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(layerSize, numLayers, false, true);
+			net = new ControllerNeuralNet(false, layerSize, numLayers, false, true);
 			
 			int paramNum = 0;
 			while (in.hasNextLine() && net.hasMoreSetup())
@@ -199,7 +199,7 @@ public class BubbleBobbleAi3 implements AiAgent {
 				20452414, 20834989, 22643841, 23248948, 26187211, 27332024, 38767736, 38767882,
 				45561100, 46095082};
 		clock = new Clock();
-		gui = new NetGui(numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();

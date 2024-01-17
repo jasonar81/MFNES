@@ -52,7 +52,7 @@ public class ContraAi2 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(layerSize, numLayers, true);
+			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
 		}
 		else
 		{
@@ -168,7 +168,7 @@ public class ContraAi2 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(layerSize, numLayers, false);
+			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
 			
 			int paramNum = 0;
 			while (in.hasNextLine() && net.hasMoreSetup())
@@ -202,7 +202,7 @@ public class ContraAi2 implements AiAgent {
 		
 		clock = new Clock();
 		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
-		gui = new NetGui(numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();

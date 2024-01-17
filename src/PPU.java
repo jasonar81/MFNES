@@ -438,6 +438,11 @@ public class PPU implements Runnable {
 					Thread.sleep(1);
 				}
 				catch(Exception e) {}
+				
+				if (terminate.get())
+				{
+					return;
+				}
 			}
 			
 			if (reset.get())

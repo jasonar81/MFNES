@@ -7,7 +7,7 @@ public class ControllerNeuralNet {
 	private int layerSize;
 	private int numLayers;
 	private int[][] parameters;
-	private int[] output = new int[6];
+	private int[] output = new int[8];
 	Memory cpuMem;
 	private int updateFirstDim;
 	private int updateSecondDim;
@@ -19,6 +19,7 @@ public class ControllerNeuralNet {
 	private GUI gui;
 	private long previousCycle = 0;
 	private int previousState = 0;
+	private boolean allButtons = false;
 	
 	public void reset()
 	{
@@ -26,11 +27,18 @@ public class ControllerNeuralNet {
 		previousState = 0;
 	}
 	
-	public ControllerNeuralNet(int layerSize, int numLayers, boolean init, boolean flag)
+	public ControllerNeuralNet(boolean allButtons, int layerSize, int numLayers, boolean init, boolean flag)
 	{
 		this.layerSize = layerSize;
 		this.numLayers = numLayers;
 		this.memoryBased = false;
+		this.allButtons = allButtons;
+		
+		int numButtons = 6;
+		if (allButtons)
+		{
+			numButtons = 8;
+		}
 		
 		parameters = new int[numLayers+1][];
 		parameters[0] = new int[displaySize * layerSize + layerSize];
@@ -39,7 +47,7 @@ public class ControllerNeuralNet {
 			parameters[i] = new int[layerSize * layerSize + layerSize];
 		}
 		
-		parameters[numLayers] = new int[layerSize * 6 + 6];
+		parameters[numLayers] = new int[layerSize * numButtons + numButtons];
 		
 		if (init)
 		{
@@ -48,11 +56,18 @@ public class ControllerNeuralNet {
 		}
 	}
 	
-	public ControllerNeuralNet(int layerSize, int numLayers, boolean init)
+	public ControllerNeuralNet(boolean allButtons, int layerSize, int numLayers, boolean init)
 	{
+		this.allButtons = allButtons;
 		this.layerSize = layerSize;
 		this.numLayers = numLayers;
 		this.memoryBased = true;
+		
+		int numButtons = 6;
+		if (allButtons)
+		{
+			numButtons = 8;
+		}
 		
 		parameters = new int[numLayers+1][];
 		parameters[0] = new int[memorySize * layerSize + layerSize];
@@ -61,7 +76,7 @@ public class ControllerNeuralNet {
 			parameters[i] = new int[layerSize * layerSize + layerSize];
 		}
 		
-		parameters[numLayers] = new int[layerSize * 6 + 6];
+		parameters[numLayers] = new int[layerSize * numButtons + numButtons];
 		
 		if (init)
 		{
@@ -156,6 +171,12 @@ public class ControllerNeuralNet {
 		int[] mem;
 		int inputSize;
 		
+		int numButtons = 6;
+		if (allButtons)
+		{
+			numButtons = 8;
+		}
+		
 		if (memoryBased)
 		{
 			mem = cpuMem.getAllMemory();
@@ -210,7 +231,7 @@ public class ControllerNeuralNet {
 		}
 		
 		//Create output values
-		for (int i = 0; i < 6; ++i)
+		for (int i = 0; i < numButtons; ++i)
 		{
 			for (int j = 0; j < layerSize; ++j)
 			{
@@ -219,7 +240,7 @@ public class ControllerNeuralNet {
 			
 			}
 			
-			output[i] += parameters[numLayers][layerSize * 6 + i];
+			output[i] += parameters[numLayers][layerSize * numButtons + i];
 		}
 	}
 	
@@ -262,8 +283,22 @@ public class ControllerNeuralNet {
 			state |= 0x04;
 		}
 		
+		if (allButtons)
+		{
+			if (output[6] >= 0)
+			{
+				state |= 0x02;
+			}
+			
+			if (output[7] >= 0)
+			{
+				state |= 0x01;
+			}
+		}
+		
 		previousState = state;
 		previousCycle = cycle;
+		//System.out.println("State = " + state);
 		return state;
 	}
 }

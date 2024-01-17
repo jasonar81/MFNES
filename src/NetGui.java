@@ -10,10 +10,12 @@ public class NetGui extends DefaultGUI {
 	private long requests = 0;
 	private ControllerNeuralNet cnn;
 	private long[] startOnOffTimes;
-	Clock clock;
+	private Clock clock;
+	private boolean allButtons;
 	
-	public NetGui(long numControllerRequests, long firstUsableCycle, ControllerNeuralNet cnn, long[] startOnOffTimes, Clock clock)
+	public NetGui(boolean allButtons, long numControllerRequests, long firstUsableCycle, ControllerNeuralNet cnn, long[] startOnOffTimes, Clock clock)
 	{
+		this.allButtons = allButtons;
 		this.numControllerRequests = numControllerRequests;
 		this.firstUsableCycle = firstUsableCycle;
 		this.cnn = cnn;
@@ -75,7 +77,30 @@ public class NetGui extends DefaultGUI {
 
 	@Override
 	public boolean getSelect() {
-		return false;
+		if (!allButtons)
+		{
+			return false;
+		}
+		
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		if (Utils.getBit(requestsWithinState, 1))
+		{
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
+			requestsWithinState = 0;
+		}
+		
+		++requests;
+		requestsWithinState = Utils.setBit(requestsWithinState, 1);
+		return Utils.getBit(state, 1);
 	}
 
 	@Override
@@ -90,7 +115,25 @@ public class NetGui extends DefaultGUI {
 			}
 		}
 		
-		return false;
+		if (!allButtons)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		if (Utils.getBit(requestsWithinState, 0))
+		{
+			state = cnn.getButtonState(clock.getPpuExpectedCycle());
+			requestsWithinState = 0;
+		}
+		
+		++requests;
+		requestsWithinState = Utils.setBit(requestsWithinState, 0);
+		return Utils.getBit(state, 0);
 	}
 
 	@Override
