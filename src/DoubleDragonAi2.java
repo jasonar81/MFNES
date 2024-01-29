@@ -91,7 +91,7 @@ public class DoubleDragonAi2 implements AiAgent {
 			while (!done) {}
 			
 			printResults();
-			System.out.println("Score of " + score);
+			System.out.println("Score of " + finalScore);
 	
 			teardown();
 			if (finalScore > highScore)

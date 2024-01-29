@@ -50,7 +50,7 @@ public class PunchOutAi2 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
+			 net = new ControllerNeuralNet(true, layerSize, numLayers, true);
 		}
 		else
 		{
