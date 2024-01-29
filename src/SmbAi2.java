@@ -112,6 +112,7 @@ public class SmbAi2 implements AiAgent {
 			else
 			{
 				net.revertParameters();
+				saveNet();
 			}
 		}
 	}
@@ -277,7 +278,13 @@ public class SmbAi2 implements AiAgent {
 	
 	private long getDistanceIntoScreen()
 	{
-		return Byte.toUnsignedLong(cpu.getMem().getLayout()[0x71d].read());
+		long retval = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x71d].read());
+		if (retval == 255 && getScreenInLevel() == 0)
+		{
+			retval = 0;
+		}
+		
+		return retval;
 	}
 	
 	private void makeModifications()

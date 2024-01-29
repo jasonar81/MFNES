@@ -32,7 +32,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	
 	private long firstUsableCycle = 102186813;
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 200000;
+	private long numControllerRequests = 5000;
 	private int layerSize = 8;
 	private int numLayers = 1;
 	
@@ -107,6 +107,7 @@ public class DoubleDragonAi2 implements AiAgent {
 			else
 			{
 				net.revertParameters();
+				saveNet();
 			}
 		}
 	}

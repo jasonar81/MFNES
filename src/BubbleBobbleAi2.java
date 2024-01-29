@@ -112,6 +112,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 			else
 			{
 				net.revertParameters();
+				saveNet();
 			}
 		}
 	}

@@ -32,7 +32,7 @@ public class SuperCAi2 implements AiAgent {
 	
 	private long firstUsableCycle = 56477303;
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 200000;
+	private long numControllerRequests = 15000;
 	private int layerSize = 8;
 	private int numLayers = 1;
 	
@@ -107,6 +107,7 @@ public class SuperCAi2 implements AiAgent {
 			else
 			{
 				net.revertParameters();
+				saveNet();
 			}
 		}
 	}
@@ -275,6 +276,12 @@ public class SuperCAi2 implements AiAgent {
 			++livesLost;
 			score = gameScore();
 			finalScore = (score * 1.0) / livesLost;
+			
+			if (totalTime == 0)
+			{
+				++finalScore; 
+			}
+			
 			done = true;
 		}
 	}
@@ -299,7 +306,8 @@ public class SuperCAi2 implements AiAgent {
 		{
 			if (cpu.getMem().getLayout()[0x53].read() == 0)
 			{
-				setDone(cycle);
+				setDone(0);
+				return;
 			}
 			
 			++livesLost;

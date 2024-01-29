@@ -113,6 +113,7 @@ public class PunchOutAi2 implements AiAgent {
 			else
 			{
 				net.revertParameters();
+				saveNet();
 			}
 		}
 	}
@@ -161,7 +162,7 @@ public class PunchOutAi2 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
+			net = new ControllerNeuralNet(true, layerSize, numLayers, false);
 			net.setParamNumToUpdate(paramNumToUpdate);
 			
 			int paramNum = 0;
@@ -374,6 +375,12 @@ public class PunchOutAi2 implements AiAgent {
 		long myDamage = myDamage();
 		
 		if (ko)
+		{
+			myDamage = 256 * 9 - 1;
+		}
+		
+		//Stuck in between rounds screen
+		if (cpuMem.getLayout()[4].read() == 1)
 		{
 			myDamage = 256 * 9;
 		}
