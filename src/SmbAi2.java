@@ -122,6 +122,7 @@ public class SmbAi2 implements AiAgent {
 		{
 			FileWriter file = new FileWriter("smb.net");
 			PrintWriter out = new PrintWriter(file);
+			out.println(net.getParamNumToUpdate());
 			out.println(layerSize);
 			out.println(numLayers);
 			out.println(numControllerRequests);
@@ -152,12 +153,15 @@ public class SmbAi2 implements AiAgent {
 			
 			Scanner in = new Scanner(file);
 			String line = in.nextLine();
+			int paramNumToUpdate = Integer.parseInt(line);
+			line = in.nextLine();
 			layerSize = Integer.parseInt(line);
 			line = in.nextLine();
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
 			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
+			net.setParamNumToUpdate(paramNumToUpdate);
 			
 			int paramNum = 0;
 			while (in.hasNextLine() && net.hasMoreSetup())

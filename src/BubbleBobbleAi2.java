@@ -161,7 +161,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
 			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
-			net.setParamNumToUpdate(param);
+			net.setParamNumToUpdate(paramNumToUpdate);
 			
 			int paramNum = 0;
 			while (in.hasNextLine() && net.hasMoreSetup())
