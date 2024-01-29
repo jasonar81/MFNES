@@ -4,12 +4,21 @@ public class NotifyChangesPort implements MemoryPort {
 	private byte val;
 	private AiAgent agent;
 	private Clock clock;
+	private boolean hold = false;
 	
 	public NotifyChangesPort(AiAgent agent, Clock clock)
 	{
 		val = 0;
 		this.agent = agent;
 		this.clock = clock;
+	}
+	
+	public NotifyChangesPort(AiAgent agent, Clock clock, byte val)
+	{
+		this.val = val;
+		this.agent = agent;
+		this.clock = clock;
+		hold = true;
 	}
 	
 	@Override
@@ -21,12 +30,12 @@ public class NotifyChangesPort implements MemoryPort {
 	public void write(byte val) {
 		if (val != this.val)
 		{
-			this.val = val;
+			if (!hold)
+			{
+				this.val = val;
+			}
+			
 			agent.progress(clock.getPpuExpectedCycle());
-		}
-		else
-		{
-			this.val = val;
 		}
 	}
 }

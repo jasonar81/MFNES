@@ -16,5 +16,6 @@ public class Register4013 implements MemoryPort {
 	public void write(byte val) {
 		int x = Byte.toUnsignedInt(val);
 		apu.setDmcSampleLength(x);
+		//System.out.println("Wrote " + String.format("0x%02X", val) + " to 0x4013");
 	}
 }

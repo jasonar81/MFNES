@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class SmbAi3 implements AiAgent {
+public class SuperCAi3 implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -20,27 +20,25 @@ public class SmbAi3 implements AiAgent {
 	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
-	private volatile long highScore = 0;
-	private volatile boolean done;
+	private volatile double highScore = 0;
+	private volatile double finalScore;
+	private volatile boolean done = false;
 	private volatile boolean startedDone;
 	private volatile long score;
+	private volatile long livesLost;
+	private volatile long totalTime;
 	
-	private static SmbAi3 instance;
+	private static SuperCAi3 instance;
 	
-	private long firstUsableCycle = 25377919; 
-	private volatile long previousTimer;
-	private volatile long previousProgressScore;
-	private volatile ArrayList<Long> screenScores;
-	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
-	
+	private long firstUsableCycle = 56477303;
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 10000;
+	private long numControllerRequests = 200000;
 	private int layerSize = 8;
 	private int numLayers = 1;
 	
 	public static void main(String[] args)
 	{
-		instance = new SmbAi3();
+		instance = new SuperCAi3();
 		instance.main();
 	}
 	
@@ -58,7 +56,7 @@ public class SmbAi3 implements AiAgent {
 		}
 		
 		setup();
-		load("smb.nes");
+		load("super_c.nes", "sav");
 		makeModifications();
 		net.reset();
 		net.setGui(gui);
@@ -67,10 +65,9 @@ public class SmbAi3 implements AiAgent {
 		while (!done) {}
 		
 		printResults();
-		System.out.println("Score of " + score);
-
-		processScreenResults();
-		highScore = score;
+		System.out.println("Score of " + finalScore);
+		
+		highScore = finalScore;
 		System.out.println("New high score!");
 		
 		teardown();
@@ -85,7 +82,7 @@ public class SmbAi3 implements AiAgent {
 		{
 			net.updateParameters();
 			setup();
-			load("smb.nes");
+			load("super_c.nes", "sav");
 			makeModifications();
 			net.reset();
 			net.setGui(gui);
@@ -94,14 +91,12 @@ public class SmbAi3 implements AiAgent {
 			while (!done) {}
 			
 			printResults();
-			System.out.println("Score of " + score);
-			
-			processScreenResults();
+			System.out.println("Score of " + finalScore);
 	
 			teardown();
-			if (score > highScore)
+			if (finalScore > highScore)
 			{
-				highScore = score;
+				highScore = finalScore;
 				System.out.println("New high score!");
 				saveNet();
 				if (numControllerRequests < 300000000)
@@ -120,7 +115,7 @@ public class SmbAi3 implements AiAgent {
 	{
 		try
 		{
-			FileWriter file = new FileWriter("smb_pixels.net");
+			FileWriter file = new FileWriter("superc_pixels.net");
 			PrintWriter out = new PrintWriter(file);
 			out.println(layerSize);
 			out.println(numLayers);
@@ -144,7 +139,7 @@ public class SmbAi3 implements AiAgent {
 	{
 		try
 		{
-			File file = new File("smb_pixels.net");
+			File file = new File("superc_pixels.net");
 			if (!file.exists())
 			{
 				return false;
@@ -179,16 +174,16 @@ public class SmbAi3 implements AiAgent {
 	
 	private void setup()
 	{
-		screenScores = new ArrayList<Long>();
+		livesLost = 0;
 		score = 0;
-		previousTimer = 999;
-		previousProgressScore = 0;
+		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {16103188, 16979809, 24542115, 25377918};
+		long[] startOnOffTimes = new long[] {9669252, 10395586, 12313900, 13330955};
 		clock = new Clock();
 		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		guiThread = new Thread(gui);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
@@ -220,13 +215,13 @@ public class SmbAi3 implements AiAgent {
 		catch(Exception e) {}
 	}
 
-	private void load(String filename)
+	private void load(String filename, String saveFilename)
 	{
 		Cartridge cart = Cartridge.loadCart(filename);
 		
 		if (cart != null)
 		{
-			cpu.setupCart(cart);
+			cpu.setupCart(cart, saveFilename);
 			ppu.setupCart(cart);
 		}
 	}
@@ -238,13 +233,18 @@ public class SmbAi3 implements AiAgent {
 		ppu.debugHold(false);
 	}
 	
+	private void printResults()
+	{
+		System.out.println("Game score = " + gameScore());
+	}
+	
 	private void on()
 	{
 		ppuThread = new Thread(ppu);
 		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread(apu);
+		apuThread = new Thread (apu);
 		apuThread.setPriority(10);
 		cpu.debugHold(true);
 		ppu.debugHold(true);
@@ -253,36 +253,11 @@ public class SmbAi3 implements AiAgent {
 		cpuThread.start();
 	}
 	
-	private void printResults()
-	{
-		System.out.println("Level = " + getLevel());
-		System.out.println("Screen in level = " + getScreenInLevel());
-		System.out.println("Distance into screen = " + getDistanceIntoScreen());
-		System.out.println("Score = " + getGameScore());
-	}
-	
-	private long getLevel()
-	{
-		return Byte.toUnsignedLong(cpu.getMem().getLayout()[0x760].read());
-	}
-	
-	private long getScreenInLevel()
-	{
-		return Byte.toUnsignedLong(cpu.getMem().getLayout()[0x71a].read());
-	}
-	
-	private long getDistanceIntoScreen()
-	{
-		return Byte.toUnsignedLong(cpu.getMem().getLayout()[0x71d].read());
-	}
-	
 	private void makeModifications()
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x0e] = new DoneRamPort((byte)6, this, clock); //Call it a wrap when there's a death
-		cpu.getMem().getLayout()[0x7fc] = new NonZeroDoneRamPort(this, clock); //I think this increments with game completions
-		cpu.getMem().getLayout()[0x71a] = new NotifyChangesPort(this, clock); //call progress when we get to a new screen
+		cpu.getMem().getLayout()[0x53] = new NotifyChangesPort(this, clock); //Lives remaining
 	}
 	
 	public void setDone(long totalTime)
@@ -290,29 +265,14 @@ public class SmbAi3 implements AiAgent {
 		if (!startedDone && !done)
 		{
 			pause();
+			System.out.println("Done");
 			startedDone = true;
-			
-			long partialScore = partialScore(totalTime);
-			
-			score += partialScore;
-			screenScores.add(partialScore);
-			screenScores = screenScores;
-			System.out.println("Screen scores size is " + screenScores.size());
-			System.out.println("Added " + partialScore + " to score");
+			this.totalTime = totalTime;
+			++livesLost;
+			score = gameScore();
+			finalScore = (score * 1.0) / livesLost;
 			done = true;
 		}
-	}
-	
-	private long partialScore(long cycle)
-	{
-		long gameScore = getGameScore();
-		long scoreDelta = gameScore - previousProgressScore;
-		long posInScreen = getDistanceIntoScreen();
-		return scoreDelta + (posInScreen << 24);
-	}
-	
-	public synchronized void setDeath(long cycle)
-	{
 	}
 	
 	private void pause()
@@ -330,73 +290,38 @@ public class SmbAi3 implements AiAgent {
 	public synchronized void progress(long cycle)
 	{
 		pause();
-		long screenScore = finishedScreenScore(cycle);
-		score += screenScore;
-		screenScores.add(screenScore);
-		screenScores = screenScores;
-		System.out.println("Screen scores size is " + screenScores.size());
-		System.out.println("Added " + screenScore + " to score");
+		
+		if (cycle >= firstUsableCycle)
+		{
+			if (cpu.getMem().getLayout()[0x53].read() == 0)
+			{
+				setDone(cycle);
+			}
+			
+			++livesLost;
+			System.out.println("Died");
+		}
+		
 		cont();
 	}
 	
-	private long getTimer()
+	private long gameScore()
 	{
-		MemoryPort[] layout = cpu.getMem().getLayout();
-		return Byte.toUnsignedLong(layout[0x7fa].read()) + Byte.toUnsignedLong(layout[0x7f9].read()) * 10 + Byte.toUnsignedLong(layout[0x7f8].read()) * 100;
-	}
-	
-	private long finishedScreenScore(long cycle)
-	{
-		long timer = getTimer();
-		long timerDelta = previousTimer - timer;
-		if (timerDelta < 0)
-		{
-			timerDelta = 999 - timer;
-		}
-		
-		long offset = 255;
-		long currentScore = getGameScore();
-		long scoreDelta = previousProgressScore - currentScore;
-		if (scoreDelta < 0)
-		{
-			scoreDelta = 0;
-		}
-		
-		previousTimer = timer;
-		previousProgressScore = currentScore;
-		
-		return ((999 - timerDelta) << 32) + (offset << 24) + scoreDelta;
-	}
-	
-	private int getGameScore()
-	{
-		MemoryPort[] layout = cpu.getMem().getLayout();
-		return Byte.toUnsignedInt(layout[0x7e2].read()) + Byte.toUnsignedInt(layout[0x7e1].read()) * 10 + Byte.toUnsignedInt(layout[0x7e0].read()) * 100 + Byte.toUnsignedInt(layout[0x7df].read()) * 1000 + Byte.toUnsignedInt(layout[0x7de].read()) * 10000 + Byte.toUnsignedInt(layout[0x7dd].read()) * 100000;
-	}
-	
-	private boolean processScreenResults()
-	{
-		boolean retval = false;
-		for (int i = 0; i < screenScores.size(); ++i)
-		{
-			if (i < bestScreenScores.size())
-			{
-				if (screenScores.get(i) > bestScreenScores.get(i))
-				{
-					retval = true;
-					System.out.println("Screen " + i + " had a new best score of " + screenScores.get(i) + " old best was " + bestScreenScores.get(i));
-					bestScreenScores.set(i, screenScores.get(i));
-				}
-			}
-			else
-			{
-				retval = true;
-				System.out.println("Screen " + i + " was never played before. Got a score of " + screenScores.get(i));
-				bestScreenScores.add(screenScores.get(i));
-			}
-		}
+		long retval = 0;
+		long val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e3].read());
+		retval += val;
+		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e4].read());
+		retval += val * 100;
+		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e5].read());
+		retval += val * 10000;
+		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x50].read());
+		retval += val * 1000000;
 		
 		return retval;
 	}
-}
 
+	@Override
+	public void setDeath(long cycle) {
+		//Easier just to handle in progress()
+	}
+}

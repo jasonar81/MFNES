@@ -55,6 +55,7 @@ public class Register4015 implements MemoryPort {
 		int x = Byte.toUnsignedInt(val);
 		apu.setAudioEnableFlags(x & 0x1f);
 		apu.clearDmcInterruptFlag();
+		//System.out.println("Cleared DMC interrupt");
 		
 		if (!Utils.getBit(x, 4))
 		{
@@ -80,6 +81,8 @@ public class Register4015 implements MemoryPort {
 		{
 			apu.setPulse1LengthCounter(0);
 		}
+		
+		//System.out.println("Wrote " + String.format("0x%02X", val) + " to 0x4015");
 	}
 
 }

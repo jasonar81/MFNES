@@ -9,17 +9,18 @@ public class ControllerNeuralNet {
 	private int[][] parameters;
 	private int[] output = new int[8];
 	Memory cpuMem;
-	private int updateFirstDim;
-	private int updateSecondDim;
 	private int oldValue;
 	private int numParametersSet = 0;
-	private int memorySize = 0x10000 - 0x8000 + 0x800;
+	private int memorySize = 0x800;
 	private boolean memoryBased;
 	private int displaySize = 280 * 240;
 	private GUI gui;
 	private long previousCycle = 0;
 	private int previousState = 0;
 	private boolean allButtons = false;
+	private int paramNumToUpdate = 0;
+	private boolean direction = false;
+	private int updatesInARow = 0;
 	
 	public void reset()
 	{
@@ -90,6 +91,16 @@ public class ControllerNeuralNet {
 		return numParametersSet < numParameters();
 	}
 	
+	public int getParamNumToUpdate()
+	{
+		return paramNumToUpdate;
+	}
+	
+	public void setParamNumToUpdate(int x)
+	{
+		paramNumToUpdate = x;
+	}
+	
 	public void setParameter(int val, int num)
 	{
 		int offset = 0;
@@ -144,24 +155,94 @@ public class ControllerNeuralNet {
 	
 	public void updateParameters()
 	{
-		updateFirstDim = Math.abs(ThreadLocalRandom.current().nextInt()) % parameters.length;
-		updateSecondDim = Math.abs(ThreadLocalRandom.current().nextInt()) % parameters[updateFirstDim].length;
-		oldValue = parameters[updateFirstDim][updateSecondDim];
-		parameters[updateFirstDim][updateSecondDim] = ThreadLocalRandom.current().nextInt();
+		if (paramNumToUpdate == numParameters())
+		{
+			paramNumToUpdate = 0;
+		}
+		
+		oldValue = getParameter(paramNumToUpdate);
+		int newValue = oldValue;
+		if (direction)
+		{
+			++newValue;
+		}
+		else
+		{
+			--newValue;
+		}
+		
+		setParameter(newValue, paramNumToUpdate);
+		System.out.println("Setting parameter " + paramNumToUpdate + " to " + newValue);
+		++updatesInARow;
+	}
+	
+	private int nextParamNum(int x)
+	{
+		if (x == numParameters())
+		{
+			return 0;
+		}
+		if (x < 0x800 * (layerSize - 1))
+		{
+			return x + 0x800;
+		}
+		else if (x < 0x800 * layerSize)
+		{
+			return (x % 0x800) + 1;
+		}
+		else
+		{
+			return x + 1;
+		}
 	}
 	
 	public void revertParameters()
 	{
-		parameters[updateFirstDim][updateSecondDim] = oldValue;
+		setParameter(oldValue, paramNumToUpdate);
+		
+		if (updatesInARow >= 2)
+		{
+			direction = false;
+			paramNumToUpdate = nextParamNum(paramNumToUpdate);
+		}
+		else if (!direction)
+		{
+			direction = true;
+		}
+		else
+		{
+			direction = false;
+			paramNumToUpdate = nextParamNum(paramNumToUpdate);
+		}
+		
+		updatesInARow = 0;
 	}
 	
 	private void initParameters()
-	{
+	{	
 		for (int i = 0; i < parameters.length; ++i)
 		{
 			for (int j = 0; j < parameters[i].length; ++j)
 			{
-				parameters[i][j] = ThreadLocalRandom.current().nextInt();
+				if (i == 0)
+				{
+					parameters[i][j] = 0;
+				}
+				else if (i == parameters.length - 1)
+				{
+					if ((j % layerSize) ==  (j / layerSize))
+					{
+						parameters[i][j] = 1;
+					}
+					else
+					{
+						parameters[i][j] = 0;
+					}
+				}
+				else
+				{
+					parameters[i][j] = 1;
+				}
 			}
 		}
 	}
@@ -179,7 +260,7 @@ public class ControllerNeuralNet {
 		
 		if (memoryBased)
 		{
-			mem = cpuMem.getAllMemory();
+			mem = cpuMem.getAllRam();
 			inputSize = memorySize;
 		}
 		else
@@ -233,6 +314,7 @@ public class ControllerNeuralNet {
 		//Create output values
 		for (int i = 0; i < numButtons; ++i)
 		{
+			output[i] = 0;
 			for (int j = 0; j < layerSize; ++j)
 			{
 				int x = parameters[numLayers][i * layerSize + j] * temp[j];		
@@ -253,44 +335,44 @@ public class ControllerNeuralNet {
 		
 		run();
 		int state = 0;
-		if (output[0] >= 0)
+		if (output[0] > 0)
 		{
 			state |= 0x80;
 		}
 		
-		if (output[1] >= 0)
+		if (output[1] > 0)
 		{
 			state |= 0x40;
 		}
 		
-		if (output[2] >= 0)
+		if (output[2] > 0)
 		{
 			state |= 0x20;
 		}
 		
-		if (output[3] >= 0)
+		if (output[3] > 0)
 		{
 			state |= 0x10;
 		}
 		
-		if (output[4] >= 0)
+		if (output[4] > 0)
 		{
 			state |= 0x08;
 		}
 		
-		if (output[5] >= 0)
+		if (output[5] > 0)
 		{
 			state |= 0x04;
 		}
 		
 		if (allButtons)
 		{
-			if (output[6] >= 0)
+			if (output[6] > 0)
 			{
 				state |= 0x02;
 			}
 			
-			if (output[7] >= 0)
+			if (output[7] > 0)
 			{
 				state |= 0x01;
 			}

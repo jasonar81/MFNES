@@ -35,8 +35,8 @@ public class BubbleBobbleAi3 implements AiAgent {
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
 	private long numControllerRequests = 200000;
-	private int layerSize = 512;
-	private int numLayers = 3;
+	private int layerSize = 8;
+	private int numLayers = 1;
 	
 	public static void main(String[] args)
 	{
@@ -81,14 +81,9 @@ public class BubbleBobbleAi3 implements AiAgent {
 			saveNet();
 		}
 		
-		boolean doUpdate = true;
 		while (true)
 		{
-			if (doUpdate)
-			{
-				net.updateParameters();
-			}
-			
+			net.updateParameters();
 			setup();
 			load("bubble_bobble.nes", "sav");
 			makeModifications();
@@ -104,7 +99,7 @@ public class BubbleBobbleAi3 implements AiAgent {
 			processScreenResults();
 	
 			teardown();
-			if (!doUpdate || score > highScore)
+			if (score > highScore)
 			{
 				highScore = score;
 				System.out.println("New high score!");
@@ -113,13 +108,10 @@ public class BubbleBobbleAi3 implements AiAgent {
 				{
 					numControllerRequests *= 2;
 				}
-				
-				doUpdate = !doUpdate;
 			}
 			else
 			{
 				net.revertParameters();
-				doUpdate = true;
 			}
 		}
 	}
@@ -409,37 +401,37 @@ public class BubbleBobbleAi3 implements AiAgent {
 	private long gameScore()
 	{
 		long retval = 0;
-		int val = cpu.getMem().getLayout()[0x44a].read();
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44a].read());
 		if (val != 0x27)
 		{
 			retval += val;
 		}
 		
-		val = cpu.getMem().getLayout()[0x449].read();
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x449].read());
 		if (val != 0x27)
 		{
 			retval += (val * 10);
 		}
 		
-		val = cpu.getMem().getLayout()[0x448].read();
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x448].read());
 		if (val != 0x27)
 		{
 			retval += (val * 100);
 		}
 		
-		val = cpu.getMem().getLayout()[0x447].read();
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x447].read());
 		if (val != 0x27)
 		{
 			retval += (val * 1000);
 		}
 		
-		val = cpu.getMem().getLayout()[0x446].read();
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x446].read());
 		if (val != 0x27)
 		{
 			retval += (val * 10000);
 		}
 		
-		val = cpu.getMem().getLayout()[0x445].read();
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x445].read());
 		if (val != 0x27)
 		{
 			retval += (val * 100000);

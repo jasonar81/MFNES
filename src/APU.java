@@ -106,6 +106,8 @@ public class APU implements Runnable {
 	private volatile boolean terminate = false;
 	private volatile boolean reset = false;
 	
+	private volatile boolean disableFrameInterrupts = false;
+	
 	public APU(CPU cpu, GUI gui, Clock clock) 
 	{
 		this.cpu = cpu;
@@ -131,6 +133,11 @@ public class APU implements Runnable {
 		}
 	}
 	
+	public void setDisableFrameInterrupt(boolean val)
+	{
+		disableFrameInterrupts = val;
+	}
+	
 	public void setReset()
 	{
 		reset = true;
@@ -149,6 +156,7 @@ public class APU implements Runnable {
 	public void setDmcSampleAddress(int val)
 	{
 		dmcSampleAddress = 0xc000 + val * 64;
+		//System.out.println("DMC sample address = " + String.format("0x%04X", dmcSampleAddress));
 		dmcStartSampleAddress = dmcSampleAddress;
 	}
 	
@@ -161,6 +169,7 @@ public class APU implements Runnable {
 	{
 		dmcSampleLength = val * 16 + 1;
 		dmcSamplesRemaining = dmcSampleLength;
+		//System.out.println("DMC sample length = " + String.format("0x%04X", dmcSampleLength));
 	}
 	
 	public void setDmcChannelValue(int val)
@@ -498,6 +507,7 @@ public class APU implements Runnable {
 		dmcOutputUnit &= 0x03;
 		previous = -1;
 		reset = false;
+		dmcSamplesRemaining = 0;
 	}
 	
 	public void runPerCycleAudioLogic(long cycle)
@@ -666,8 +676,12 @@ public class APU implements Runnable {
 			{
 				if (!Utils.getBit(audioTimerRegister, 6))
 				{
-					frameInterruptFlag = true;
-					cpu.setIrq();
+					if (!disableFrameInterrupts)
+					{
+						frameInterruptFlag = true;
+						//System.out.println("IRQ because of frame interrupt");
+						cpu.setIrq();
+					}
 				}
 				
 				audioCheck = 29829;
@@ -676,8 +690,12 @@ public class APU implements Runnable {
 			{
 				if (!Utils.getBit(audioTimerRegister, 6))
 				{
-					frameInterruptFlag = true;
-					cpu.setIrq();
+					if (!disableFrameInterrupts)
+					{
+						frameInterruptFlag = true;
+						cpu.setIrq();
+						//System.out.println("IRQ because of frame interrupt");
+					}
 				}
 				
 				audioCheck = 29830;
@@ -692,8 +710,12 @@ public class APU implements Runnable {
 			{
 				if (!Utils.getBit(audioTimerRegister, 6))
 				{
-					frameInterruptFlag = true;
-					cpu.setIrq();
+					if (!disableFrameInterrupts)
+					{
+						frameInterruptFlag = true;
+						cpu.setIrq();
+						//System.out.println("IRQ because of frame interrupt");
+					}
 				}
 				
 				qfCounter = 0;
@@ -746,38 +768,45 @@ public class APU implements Runnable {
 		}
 		
 		++dmcInternalCounter;
-		if (dmcInternalCounter == dmcRate)
+		if (dmcInternalCounter >= dmcRate)
 		{
-			if (Utils.getBit(dmcOutputUnit, 0) && !dmcSilenceFlag)
+			if (dmcRate > 0)
 			{
-				if (dmcChannelValue <= 125)
+				if (Utils.getBit(dmcOutputUnit, 0) && !dmcSilenceFlag)
 				{
-					dmcChannelValue += 2;
+					if (dmcChannelValue <= 125)
+					{
+						dmcChannelValue += 2;
+					}
+				} else if (!Utils.getBit(dmcOutputUnit, 0) && !dmcSilenceFlag)
+				{
+					if (dmcChannelValue >= 2)
+					{
+						dmcChannelValue -= 2;
+					}
 				}
-			} else if (!Utils.getBit(dmcOutputUnit, 0) && !dmcSilenceFlag)
-			{
-				if (dmcChannelValue >= 2)
+				
+				dmcOutputUnit >>= 1;
+				--dmcBitsRemainingCounter;
+				dmcInternalCounter = 0;
+				if (dmcBitsRemainingCounter == 0)
 				{
-					dmcChannelValue -= 2;
+					dmcBitsRemainingCounter = 8;
+					if (!dmcSampleBufferLoaded)
+					{
+						dmcSilenceFlag = true;
+					}
+					else
+					{
+						dmcSampleBufferLoaded = false;
+						dmcSilenceFlag = false;
+						dmcOutputUnit = dmcSampleBufferValue;
+					}
 				}
 			}
-			
-			dmcOutputUnit >>= 1;
-			--dmcBitsRemainingCounter;
-			dmcInternalCounter = 0;
-			if (dmcBitsRemainingCounter == 0)
+			else
 			{
-				dmcBitsRemainingCounter = 8;
-				if (!dmcSampleBufferLoaded)
-				{
-					dmcSilenceFlag = true;
-				}
-				else
-				{
-					dmcSampleBufferLoaded = false;
-					dmcSilenceFlag = false;
-					dmcOutputUnit = dmcSampleBufferValue;
-				}
+				dmcInternalCounter = 0;
 			}
 		}
 		
@@ -789,6 +818,7 @@ public class APU implements Runnable {
 				dmcSampleBufferLoaded = true;
 				dmcSampleBufferValue = cpu.getMem().read(dmcSampleAddress);
 				--dmcSamplesRemaining;
+				//System.out.println("Loaded new sample " + dmcSamplesRemaining + " remaining");
 				++dmcSampleAddress;
 				if (dmcSampleAddress == 0x10000)
 				{
@@ -803,26 +833,25 @@ public class APU implements Runnable {
 						dmcSampleAddress = dmcStartSampleAddress;
 					} else if (dmcIrqEnabled)
 					{
+						//System.out.println("Setting interrupt flag because of no samples remaining");
 						dmcInterruptFlag = true;
+						cpu.setIrq();
 					}
 				}
 			}
 		}
 		
-		if (Utils.getBit(audioEnableFlags, 4) && !dmcSampleBufferLoaded && dmcLoadCountdown == 0)
+		if (dmcSamplesRemaining > 0 && Utils.getBit(audioEnableFlags, 4) && !dmcSampleBufferLoaded && dmcLoadCountdown == 0)
 		{
 			dmcLoadCountdown = 4;
-		}
-		
-		if (dmcInterruptFlag)
-		{
-			cpu.setIrq();
 		}
 		
 		if (cycle % 120 == 0)
 		{
 			doApuOutput();
 		}
+		
+		//System.out.println("Cycle");
 	}
 	
 	private void decrementLengthCounters()
@@ -960,6 +989,8 @@ public class APU implements Runnable {
 		{
 			retval = dmcChannelValue;
 		}
+		
+		//System.out.println(retval);
 		return retval;
 	}
 	

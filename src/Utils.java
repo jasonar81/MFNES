@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 
 public class Utils {
@@ -32,5 +33,32 @@ public class Utils {
 	{
 		raf.seek(offset);
 		return raf.readByte();
+	}
+	
+	static void executeCommand(String cmd)
+	{
+		Process p;
+		
+		try {
+			p = Runtime.getRuntime().exec(new String[]{"sh", "-c", cmd});
+			InputStream stdout = p.getInputStream();
+			InputStream stderr = p.getErrorStream();
+			StreamEater stdoutEater = new StreamEater (stdout);
+			StreamEater stderrEater = new StreamEater (stderr);
+			stdoutEater.start();
+			stderrEater.start();
+			  
+			while (true)
+			{
+				try
+				{
+					p.waitFor();
+					break;
+				}
+				catch(Exception f) {}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }

@@ -76,17 +76,15 @@ public class Cartridge {
 			
 			//number of 16KB PRG-ROM chunks
 			retval.numPrg = Byte.toUnsignedInt(bytes[4]);
-			retval.prgRom = new byte[16384 * retval.numPrg];
 			
 			//number of 8KB CHR-ROM chunks
 			retval.numChr = Byte.toUnsignedInt(bytes[5]);
-			retval.chrRom = new byte[8192 * retval.numChr];
 			
 			int flag6 = Byte.toUnsignedInt(bytes[6]);
 			int flag7 = Byte.toUnsignedInt(bytes[7]);
-			//int flag8 = Byte.toUnsignedInt(bytes[8]);
-			//int flag9 = Byte.toUnsignedInt(bytes[9]);
-			//int flag10 = Byte.toUnsignedInt(bytes[10]);
+			int flag8 = Byte.toUnsignedInt(bytes[8]);
+			int flag9 = Byte.toUnsignedInt(bytes[9]);
+			int flag10 = Byte.toUnsignedInt(bytes[10]);
 			
 			retval.mapper = (flag7 & 0xf0) + (flag6 >> 4);
 			retval.vertMirroring = Utils.getBit(flag6, 0);
@@ -98,6 +96,23 @@ public class Cartridge {
 			retval.trainer = Utils.getBit(flag6, 2);
 			
 			retval.fourScreen = Utils.getBit(flag6, 3);
+			
+			if (Utils.getBit(flag7, 3) && !Utils.getBit(flag7, 2))
+			{
+				retval.mapper += ((flag8 & 0x0f) << 8);
+				retval.numPrg += ((flag9 & 0x0f) << 8);
+				retval.numChr += ((flag9 & 0xf0) << 4);
+			}
+			//Format 3 I defined for myself for even larger carts for even more fun!
+			else if (Utils.getBit(flag7, 3) && Utils.getBit(flag7, 2))
+			{
+				retval.mapper += (flag8 << 8);
+				retval.numPrg += (flag9 << 8);
+				retval.numChr += (flag10 << 8);
+			}
+			
+			retval.prgRom = new byte[16384 * retval.numPrg];
+			retval.chrRom = new byte[8192 * retval.numChr];
 			
 			int offset = 16;
 			if (retval.trainer)

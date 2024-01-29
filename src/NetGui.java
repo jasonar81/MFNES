@@ -12,6 +12,7 @@ public class NetGui extends DefaultGUI {
 	private long[] startOnOffTimes;
 	private Clock clock;
 	private boolean allButtons;
+	private long[] selectTimes = new long[0];
 	
 	public NetGui(boolean allButtons, long numControllerRequests, long firstUsableCycle, ControllerNeuralNet cnn, long[] startOnOffTimes, Clock clock)
 	{
@@ -21,6 +22,11 @@ public class NetGui extends DefaultGUI {
 		this.cnn = cnn;
 		this.startOnOffTimes = startOnOffTimes;
 		this.clock = clock;
+	}
+	
+	public void setSelectTimes(long[] selectTimes)
+	{
+		this.selectTimes = selectTimes;
 	}
 	
 	@Override
@@ -77,6 +83,16 @@ public class NetGui extends DefaultGUI {
 
 	@Override
 	public boolean getSelect() {
+		long cycle = clock.getPpuExpectedCycle();
+		
+		for (int i = 0; i < selectTimes.length; i += 2)
+		{
+			if (cycle >= selectTimes[i] && cycle < selectTimes[i+1])
+			{
+				return true;
+			}
+		}
+		
 		if (!allButtons)
 		{
 			return false;

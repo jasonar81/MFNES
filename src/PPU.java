@@ -793,6 +793,7 @@ public class PPU implements Runnable {
 				if ((activeSprite & 0x0000000000002000L) != 0)
 				{
 					//It's a background sprite
+					int bgFill = color;
 					int spriteColor = spriteColors[x];
 					if (spriteColor != -1)
 					{
@@ -809,7 +810,8 @@ public class PPU implements Runnable {
 						
 						if (spriteZeroFlag && spriteColor != -1 && 
 								(activeSprite & 0xff) != 0xff && x < 255 &&
-								((activeSprite & 0x00000000ff000000L) >> 24) < 239)
+								((activeSprite & 0x00000000ff000000L) >> 24) < 239
+								&& ((activeSprite & 0x00000000ff000000L) >> 24) > 0)
 						{
 							statusOr(0x40);
 							//System.out.println("Sprite zero flag set on scanline " + scanline);
@@ -819,6 +821,7 @@ public class PPU implements Runnable {
 				else
 				{
 					//Foreground sprite
+					int bgFill = color;
 					int bgColor = -1;
 					if (displayBackground)
 					{
@@ -838,7 +841,8 @@ public class PPU implements Runnable {
 					
 					if (spriteZeroFlag && spriteColor != -1 && 
 							(activeSprite & 0xff) != 0xff && x < 255 &&
-							((activeSprite & 0x00000000ff000000L) >> 24) < 239)
+							((activeSprite & 0x00000000ff000000L) >> 24) < 239
+							&& ((activeSprite & 0x00000000ff000000L) >> 24) > 0)
 					{
 						statusOr(0x40);
 						//System.out.println("Sprite zero flag set on scanline " + scanline);
@@ -1305,7 +1309,7 @@ public class PPU implements Runnable {
 	{
 		clock.setPpuExpectedCycle(++cycle);
 		long expected = clock.getCpuExpectedCycle();
-		while (expected < cycle) 
+		while (expected < cycle - (cycle %3)) 
 		{
 			if (terminate.get())
 			{
@@ -1313,11 +1317,6 @@ public class PPU implements Runnable {
 			}
 			
 			expected = clock.getCpuExpectedCycle();
-		}
-		
-		if (expected - cycle > 3)
-		{
-			System.out.println("P" + (expected - cycle));
 		}
 		
 		if (overage > 0)

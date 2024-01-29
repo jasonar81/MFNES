@@ -2411,7 +2411,6 @@ public class CPU implements Runnable {
 		stackPush(pc >> 8);
 		stackPush(pc & 0xff);
 		stackPush(p | 0x30);
-		setI();
 		int low = memRead(0xfffe);
 		int high = memRead(0xffff);
 		pc = Utils.makeUnsigned(low, high);
@@ -2464,6 +2463,7 @@ public class CPU implements Runnable {
 			log.println("IRQ");
 		}
 		
+		//System.out.println("IRQ");
 		stackPush(pc >> 8);
 		stackPush(pc & 0xff);
 		stackPush((p & 0xef) | 0x20);
@@ -3390,7 +3390,7 @@ public class CPU implements Runnable {
 	{
 		if ((addr1 & 0xff00) != (addr2 & 0xff00))
 		{
-			incrementCycle();
+			memRead((addr2 & 0xff) + (addr1 & 0xff00));
 		}
 	}
 	

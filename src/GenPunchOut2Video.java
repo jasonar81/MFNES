@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class PunchOutAi2 implements AiAgent {
+public class GenPunchOut2Video implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -20,44 +20,43 @@ public class PunchOutAi2 implements AiAgent {
 	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
-	private volatile long highScore = 0;
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
-	private volatile long score;
-	private volatile int currentLevel = 0;
-	private volatile boolean knockOut = false;
 	private volatile boolean justFinishedLevel = false;
-	private volatile long previousCycle;
+	private volatile int currentLevel = 0;
 	
-	private static PunchOutAi2 instance;
+	private static GenPunchOut2Video instance;
 	
 	private long firstUsableCycle = 62856095;
-	private volatile ArrayList<Long> screenScores;
-	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
+	
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 40000;
-	private int layerSize = 8;
-	private int numLayers = 1;
+	private long numControllerRequests;
+	private int layerSize;
+	private int numLayers;
+	
+	private String dir;
+	private String ts;
 	
 	public static void main(String[] args)
 	{
-		instance = new PunchOutAi2();
-		instance.main();
+		instance = new GenPunchOut2Video();
+		String dir = args[0];
+		String ts = args[1];
+		instance.main(dir, ts);
 	}
 	
-	private void main()
-	{
-		boolean fileExists = false;
-		if (!loadNet())
+	public void main(String dir, String ts)
+	{	
+		if (!dir.endsWith("/"))
 		{
-			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
-		}
-		else
-		{
-			fileExists = true;
-			System.out.println("Successfully load a " + layerSize + "x" + numLayers + " net with up to " + numControllerRequests + " events");
+			dir = (dir + "/");
 		}
 		
+		this.dir = dir;
+		this.ts = ts;
+		
+		//Run
+		loadNet(dir + "punch_out" + ts + ".net");
 		setup();
 		load("punch_out.nes", "sav");
 		makeModifications();
@@ -67,89 +66,14 @@ public class PunchOutAi2 implements AiAgent {
 		
 		while (!done) {}
 		
-		printResults();
-		System.out.println("Score of " + score);
-
-		processScreenResults();
-		highScore = score;
-		System.out.println("New high score!");
-		
 		teardown();
-		
-		if (!fileExists)
-		{
-			System.out.println("File did not exist, so saving newly created network");
-			saveNet();
-		}
-		
-		while (true)
-		{
-			net.updateParameters();
-			setup();
-			load("punch_out.nes", "sav");
-			makeModifications();
-			net.reset();
-			net.setCpuMem(cpuMem);
-			run();
-			
-			while (!done) {}
-			
-			printResults();
-			System.out.println("Score of " + score);
-			
-			processScreenResults();
-	
-			teardown();
-			if (score > highScore)
-			{
-				highScore = score;
-				System.out.println("New high score!");
-				saveNet();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 2;
-				}
-			}
-			else
-			{
-				net.revertParameters();
-			}
-		}
 	}
 	
-	private void saveNet()
+	private boolean loadNet(String filename)
 	{
 		try
 		{
-			FileWriter file = new FileWriter("punch_out.net");
-			PrintWriter out = new PrintWriter(file);
-			out.println(layerSize);
-			out.println(numLayers);
-			out.println(numControllerRequests);
-			
-			int numParameters = net.numParameters();
-			for (int i = 0; i < numParameters; ++i)
-			{
-				out.println(net.getParameter(i));
-			}
-			
-			out.close();
-		}
-		catch(Exception e)
-		{
-			e.printStackTrace();
-		}
-	}
-	
-	private boolean loadNet()
-	{
-		try
-		{
-			File file = new File("punch_out.net");
-			if (!file.exists())
-			{
-				return false;
-			}
+			File file = new File(filename);
 			
 			Scanner in = new Scanner(file);
 			String line = in.nextLine();
@@ -180,17 +104,13 @@ public class PunchOutAi2 implements AiAgent {
 	
 	private void setup()
 	{
-		previousCycle = firstUsableCycle;
-		knockOut = false;
-		currentLevel = 0;
-		screenScores = new ArrayList<Long>();
-		score = 0;
 		done = false;
 		startedDone = false;
+		currentLevel = 0;
 		
 		long[] startOnOffTimes = new long[] {61779177, 62856094};
 		clock = new Clock();
-		gui = new NetGui(true, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new RecordingNetGui(true, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock, dir + "punch_out_memory" + ts + ".mp4");
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
@@ -240,13 +160,6 @@ public class PunchOutAi2 implements AiAgent {
 		ppu.debugHold(false);
 	}
 	
-	private void printResults()
-	{
-		System.out.println("Level = " + cpu.getMem().read(0x01));
-		System.out.println("Total damage delivered " + enemyDamage());
-		System.out.println("Total damage sustained " + myDamage());
-	}
-	
 	private void on()
 	{
 		ppuThread = new Thread(ppu);
@@ -286,14 +199,8 @@ public class PunchOutAi2 implements AiAgent {
 		if (!startedDone && !done)
 		{
 			pause();
-			System.out.println("Done");
-			//Events list ran out
 			startedDone = true;
-			long screenScore = partialScore(knockOut);
-			screenScores.add(screenScore);
-			score += screenScore;
 			cont();
-			System.out.println("Screen scores size is " + screenScores.size());
 			done = true;
 		}
 	}
@@ -320,13 +227,9 @@ public class PunchOutAi2 implements AiAgent {
 		if (cpu.getMem().getLayout()[0x01].read() > currentLevel)
 		{
 			//new level 
-			System.out.println("Finished level");
 			++currentLevel;
-			long screenScore = finishedScreenScore(cycle);
-			screenScores.add(screenScore);
 			((TrackSumOfSubtractionsPort)cpu.getMem().getLayout()[0x391]).reset();
 			((TrackSumOfSubtractionsPort)cpu.getMem().getLayout()[0x398]).reset();
-			score += screenScore;
 			justFinishedLevel = true;
 		}
 		else if (cpu.getMem().getLayout()[0x391].read() == 0)
@@ -334,8 +237,6 @@ public class PunchOutAi2 implements AiAgent {
 			if (!justFinishedLevel)
 			{
 				//Knocked out
-				knockOut = true;
-				System.out.println("Knocked out");
 				setDone(cycle);
 			}
 			else
@@ -347,60 +248,6 @@ public class PunchOutAi2 implements AiAgent {
 		}
 		
 		cont();
-	}
-	
-	private long finishedScreenScore(long cycle)
-	{
-		//enemy damage / 255 - my damage / 255 - (seconds / 10)
-		long enemyDamage = 256 * 9; //impossible to deliver more damage than this
-		long myDamage = myDamage();
-		long seconds = (long)((cycle - previousCycle) / 5369317.5);
-		if (seconds > 2550)
-		{
-			seconds = 2550;
-		}
-		
-		previousCycle = cycle;
-		return (enemyDamage << 24) + ((256 * 9 - myDamage) << 8) + (255 - seconds / 10); 
-	}
-	
-	private long partialScore(boolean ko)
-	{
-		long enemyDamage = enemyDamage();
-		long myDamage = myDamage();
-		
-		if (ko)
-		{
-			myDamage = 256 * 9;
-		}
-		
-		long seconds = 255 * 10;
-		return (enemyDamage << 24) + ((256 * 9 - myDamage) << 8) + (255 - seconds / 10); 
-	}
-	
-	private boolean processScreenResults()
-	{
-		boolean retval = false;
-		for (int i = 0; i < screenScores.size(); ++i)
-		{
-			if (i < bestScreenScores.size())
-			{
-				if (screenScores.get(i) > bestScreenScores.get(i))
-				{
-					retval = true;
-					System.out.println("Screen " + i + " had a new best score of " + screenScores.get(i) + " old best was " + bestScreenScores.get(i));
-					bestScreenScores.set(i, screenScores.get(i));
-				}
-			}
-			else
-			{
-				retval = true;
-				System.out.println("Screen " + i + " was never played before. Got a score of " + screenScores.get(i));
-				bestScreenScores.add(screenScores.get(i));
-			}
-		}
-		
-		return retval;
 	}
 
 	@Override

@@ -1,5 +1,6 @@
 //DefaultGui that can encode a recording
 
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -9,7 +10,7 @@ import java.util.ArrayList;
 import javax.imageio.ImageIO;
 
 public class RecordingGui extends DefaultGUI {
-	private String outputFilename;
+	protected String outputFilename;
 	private int frameNum = 0;
 	private boolean ready = false;
 	private ArrayList<File> files = new ArrayList<File>();
@@ -33,15 +34,57 @@ public class RecordingGui extends DefaultGUI {
 		{
 			if (terminate)
 			{
-				doEncoding();
 				return;
 			}
 			
-			try
+			Graphics g = null;
+			
+			if (strategy != null)
 			{
-				Thread.sleep(1000);
+				g = strategy.getDrawGraphics();
 			}
-			catch(Exception e) {}
+			
+			while (!swap.get()) {
+				if (playback)
+				{
+					runPlayback(clock.getPpuExpectedCycle());
+				}
+				
+				if (terminate)
+				{
+					doEncoding();
+					return;
+				}
+			}
+			
+			if (g != null)
+			{
+				img.getRaster().setDataElements(0, 0, 280, 240, imgData);
+				img = img;
+				while (!g.drawImage(img, x.get(), y.get(), width.get(), height.get(), null)) 
+				{
+					if (playback)
+					{
+						runPlayback(clock.getPpuExpectedCycle());
+					}
+				}
+			}
+			
+			swap.set(false);
+			
+			if (g != null)
+			{
+				g.dispose();
+				if (!strategy.contentsLost())
+				{
+					strategy.show();
+				}
+			}
+			
+			if (playback)
+			{
+				runPlayback(clock.getPpuExpectedCycle());
+			}
 		}
 	}
 	
@@ -75,7 +118,7 @@ public class RecordingGui extends DefaultGUI {
 		}
 	}
 	
-	private void doEncoding()
+	protected void doEncoding()
 	{
 		String glob;
 		int index = outputFilename.lastIndexOf('/');
@@ -88,7 +131,9 @@ public class RecordingGui extends DefaultGUI {
 			glob = outputFilename.substring(0, index+1) + "*" + outputFilename.substring(index+1) + ".jpg";
 		}
 		
-		String cmd = "ffmpeg -framerate 60 -pattern_type glob -i '" + glob + "' -c:v libx264 -pix_fmt yuv420p " + outputFilename + ".tmp.mp4"; 
+		System.out.println("Doing encoding");
+		String cmd = "ffmpeg -y -framerate 60 -pattern_type glob -i '" + glob + "' -c:v libx264 -pix_fmt yuv420p " + outputFilename + ".tmp.mp4"; 
+		//System.out.println(cmd);
 		Process p;
 		
 		try {
@@ -113,7 +158,8 @@ public class RecordingGui extends DefaultGUI {
 			e.printStackTrace();
 		}
 		
-		cmd = "ffmpeg -i " + outputFilename + ".tmp.mp4" + " -vf scale=960:720 " + outputFilename;
+		System.out.println("Doing rescaling");
+		cmd = "ffmpeg -y -i " + outputFilename + ".tmp.mp4" + " -vf scale=960:720 " + outputFilename;
 		
 		try {
 			p = Runtime.getRuntime().exec(new String[]{"sh", "-c", cmd});
@@ -137,6 +183,7 @@ public class RecordingGui extends DefaultGUI {
 			e.printStackTrace();
 		}
 		
+		System.out.println("Removing temporary");
 		cmd = "rm -f " + outputFilename + ".tmp.mp4";
 		
 		try {
@@ -161,6 +208,7 @@ public class RecordingGui extends DefaultGUI {
 			e.printStackTrace();
 		}
 		
+		System.out.println("Removing jpgs");
 		for (File file : files)
 		{
 			file.delete();

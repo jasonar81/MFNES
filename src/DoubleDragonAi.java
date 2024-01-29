@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BubbleBobbleAi implements AiAgent {
+public class DoubleDragonAi implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -20,30 +20,21 @@ public class BubbleBobbleAi implements AiAgent {
 	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
-	private volatile long highScore = 0;
+	private volatile double highScore = 0;
+	private volatile double finalScore;
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
-	private volatile long totalTime;
 	private volatile long score;
-	private volatile int currentLevel = 1;
-	private volatile long previousScore = 0;
+	private volatile long livesLost;
+	private volatile long totalTime;
 	
-	private static BubbleBobbleAi instance;
+	private static DoubleDragonAi instance;
 	
-	private long firstUsableCycle = 52853029;
-	private volatile ArrayList<Long> screenScores;
-	private volatile ArrayList<Long> screenStartTimes;
-	private volatile ArrayList<Long> screenEndTimes;
-	private volatile ArrayList<Integer> screenStartButtonStates;
-	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
-	private ArrayList<ArrayList<ControllerEvent>> bestScreenControls = new ArrayList<ArrayList<ControllerEvent>>();
-	private ArrayList<Long> bestScreenStartTimes = new ArrayList<Long>();
-	private ArrayList<Integer> bestScreenStartButtonStates = new ArrayList<Integer>();
-	private ArrayList<Long> bestScreenEndTimes = new ArrayList<Long>();
+	private long firstUsableCycle = 102186813;
 	
 	public static void main(String[] args)
 	{
-		instance = new BubbleBobbleAi();
+		instance = new DoubleDragonAi();
 		instance.main();
 	}
 	
@@ -52,9 +43,9 @@ public class BubbleBobbleAi implements AiAgent {
 		while (true)
 		{
 			setup();
-			load("bubble_bobble.nes", "sav");
+			load("double_dragon.nes", "sav");
 			makeModifications();
-			ArrayList<ControllerEvent> eventList = getEventList("bubble_bobble.rec");
+			ArrayList<ControllerEvent> eventList = getEventList("double_dragon.rec");
 			eventList = reduceEvents(eventList);
 			eventList = addRandomEvents(eventList);
 			gui.setEventList(eventList);
@@ -63,13 +54,12 @@ public class BubbleBobbleAi implements AiAgent {
 			while (!done) {}
 			
 			printResults();
-			System.out.println("Score of " + score);
+			System.out.println("Score of " + finalScore);
 	
-			highScore = score;
-			writeCurrentBestRecording(eventList, totalTime, "bubble_bobble.rec");
+			highScore = finalScore;
+			writeCurrentBestRecording(eventList, totalTime, "double_dragon.rec");
 			System.out.println("New high score!");
 			
-			processScreenResults(eventList);
 			System.out.println();
 			
 			teardown();
@@ -78,10 +68,10 @@ public class BubbleBobbleAi implements AiAgent {
 			while (!improved)
 			{
 				setup();
-				load("bubble_bobble.nes", "sav");
+				load("double_dragon.nes", "sav");
 				makeModifications();
 			
-				eventList = getEventList("bubble_bobble.rec");
+				eventList = getEventList("double_dragon.rec");
 				eventList = modifyEventList(eventList);
 				eventList = addRandomEvents(eventList);
 				System.out.println("Trying random things");
@@ -92,53 +82,19 @@ public class BubbleBobbleAi implements AiAgent {
 				while (!done) {}
 			
 				printResults();
-				System.out.println("Score of " + score);
-				if (score > highScore)
+				System.out.println("Score of " + finalScore);
+				if (finalScore > highScore)
 				{
-					highScore = score;
+					highScore = finalScore;
 					
-					writeCurrentBestRecording(eventList, totalTime, "bubble_bobble.rec");
+					writeCurrentBestRecording(eventList, totalTime, "double_dragon.rec");
 					System.out.println("New high score!");
+					improved = true;
 				}
-			
-				improved = processScreenResults(eventList);
 
 				System.out.println();
 				teardown();
 			}
-			
-			setup();
-			load("bubble_bobble.nes", "sav");
-			makeModifications();
-			
-			eventList = combineBest(eventList);
-			eventList = addRandomEvents(eventList);
-			System.out.println("Combining the best screens");
-			
-			gui.setEventList(eventList);
-			run();
-			
-			while (!done) {}
-			
-			printResults();
-			System.out.println("Score of " + score);
-			
-			if (score > highScore)
-			{
-				highScore = score;
-				writeCurrentBestRecording(eventList, totalTime, "bubble_bobble.rec");
-				System.out.println("New high score!");
-			}
-
-			processScreenResults(eventList);
-			System.out.println();
-			teardown();
-			
-			bestScreenScores.clear();
-			bestScreenControls.clear();
-			bestScreenStartTimes.clear();
-			bestScreenStartButtonStates.clear();
-			bestScreenEndTimes.clear();
 		}
 	}
 	
@@ -180,16 +136,7 @@ public class BubbleBobbleAi implements AiAgent {
 	
 	private void setup()
 	{
-		previousScore = 0;
-		currentLevel = 1;
-		screenScores = new ArrayList<Long>();
-		screenStartTimes = new ArrayList<Long>();
-		screenEndTimes = new ArrayList<Long>();
-		screenStartButtonStates = new ArrayList<Integer>();
-		screenStartTimes.add(firstUsableCycle);
-		screenStartTimes = screenStartTimes;
-		screenStartButtonStates.add(0);
-		screenStartButtonStates = screenStartButtonStates;
+		livesLost = 0;
 		score = 0;
 		totalTime = 0;
 		done = false;
@@ -247,13 +194,7 @@ public class BubbleBobbleAi implements AiAgent {
 	
 	private void printResults()
 	{
-		System.out.println("Level = " + screenScores.size());
 		System.out.println("Game score = " + gameScore());
-	}
-	
-	private int getLevel()
-	{
-		return ((SaveAndUpdateMaxValuePort)cpu.getMem().getLayout()[0x401]).getMaxValue();
 	}
 	
 	private void on()
@@ -275,8 +216,7 @@ public class BubbleBobbleAi implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x2e] = new NotifyChangesPort(this, clock); //Lives remaining
-		cpu.getMem().getLayout()[0x401] = new SaveAndUpdateMaxValuePort(this, clock); //Level (0 doesn't count)
+		cpu.getMem().getLayout()[0x43] = new NotifyChangesPort(this, clock, (byte)4); //Lives remaining
 	}
 	
 	public void setDone(long totalTime)
@@ -287,10 +227,9 @@ public class BubbleBobbleAi implements AiAgent {
 			System.out.println("Done");
 			startedDone = true;
 			this.totalTime = totalTime;
-			long screenScore = partialScore();
-			screenScores.add(screenScore);
-			screenEndTimes.add(totalTime);
-			score += screenScore;
+			++livesLost;
+			score = gameScore();
+			finalScore = (score * 1.0) / livesLost;
 			done = true;
 		}
 	}
@@ -438,13 +377,15 @@ public class BubbleBobbleAi implements AiAgent {
 			{
 				++i;
 				int randVal = Math.abs(ThreadLocalRandom.current().nextInt());
-				int key = randVal % 4;
+				int key = randVal % 7;
 
 				if (key == 0)
 				{
 					if (modType == 1)
 					{
 						old = addEvent(cycle, false, KeyEvent.VK_RIGHT, old);
+						old = addEvent(cycle, false, KeyEvent.VK_UP, old);
+						old = addEvent(cycle, false, KeyEvent.VK_DOWN, old);
 					}
 					
 					key =  KeyEvent.VK_LEFT;
@@ -453,16 +394,62 @@ public class BubbleBobbleAi implements AiAgent {
 					if (modType == 1)
 					{
 						old = addEvent(cycle, false, KeyEvent.VK_LEFT, old);
+						old = addEvent(cycle, false, KeyEvent.VK_UP, old);
+						old = addEvent(cycle, false, KeyEvent.VK_DOWN, old);
 					}
 					
 					key =  KeyEvent.VK_RIGHT;
 				} else if (key == 2)
-				{	
-					key =  KeyEvent.VK_S;
+				{
+					if (modType == 1)
+					{
+						old = addEvent(cycle, false, KeyEvent.VK_LEFT, old);
+						old = addEvent(cycle, false, KeyEvent.VK_RIGHT, old);
+						old = addEvent(cycle, false, KeyEvent.VK_DOWN, old);
+					}
+					
+					key =  KeyEvent.VK_UP;
 				} else if (key == 3)
 				{
-					key =  KeyEvent.VK_A;
+					if (modType == 1)
+					{
+						old = addEvent(cycle, false, KeyEvent.VK_LEFT, old);
+						old = addEvent(cycle, false, KeyEvent.VK_UP, old);
+						old = addEvent(cycle, false, KeyEvent.VK_RIGHT, old);
+					}
+					
+					key =  KeyEvent.VK_DOWN;
 				} 
+				else if (key == 4)
+				{	
+					if (modType == 1)
+					{
+						old = addEvent(cycle, false, KeyEvent.VK_A, old);
+					}
+					
+					key =  KeyEvent.VK_S;
+				} else if (key == 5)
+				{
+					if (modType == 1)
+					{
+						old = addEvent(cycle, false, KeyEvent.VK_S, old);
+					}
+					
+					key =  KeyEvent.VK_A;
+				} else
+				{
+					if (modType == 1)
+					{
+						old = addEvent(cycle, true, KeyEvent.VK_S, old);
+						old = addEvent(cycle + 400000, false, KeyEvent.VK_S, old);
+					}
+					else
+					{
+						old = addEvent(cycle, false, KeyEvent.VK_S, old);
+					}
+					
+					key =  KeyEvent.VK_A;
+				}
 				
 				old = addEvent(cycle, modType == 1, key, old);
 				
@@ -479,270 +466,40 @@ public class BubbleBobbleAi implements AiAgent {
 		return old;
 	}
 	
-	private int getButtonStates()
-	{
-		int retval = 0;
-		if (gui.getA())
-		{
-			retval |= 0x80;
-		}
-		
-		if (gui.getB())
-		{
-			retval |= 0x40;
-		}
-		
-		if (gui.getLeft())
-		{
-			retval |= 0x08;
-		}
-		
-		if (gui.getRight())
-		{
-			retval |= 0x04;
-		}
-		
-		return retval;
-	}
-	
 	public synchronized void progress(long cycle)
 	{
 		pause();
 		
-		//We got pinged because of a level change or loss of life
 		if (cycle >= firstUsableCycle)
 		{
-			int level = getLevel();
-			if (level > currentLevel)
-			{
-				//new level 
-				System.out.println("Finished level");
-				currentLevel = level;
-				System.out.println("Level is now " + level);
-				long screenScore = finishedScreenScore(cycle);
-				screenScores.add(screenScore);
-				screenEndTimes.add(cycle);
-				screenStartTimes.add(cycle);
-				screenStartButtonStates.add(getButtonStates());
-				score += screenScore;
-			}
-			else if (cpu.getMem().getLayout()[0x2e].read() == 0)
-			{
-				setDone(cycle);
-			}
+			++livesLost;
+			System.out.println("Died");
 		}
 		
 		cont();
 	}
 	
-	private long finishedScreenScore(long cycle)
-	{
-		long seconds = (long)((cycle - screenStartTimes.get(screenStartTimes.size() - 1)) / 5369317.5);
-		System.out.println("Level took " + seconds + "s");
-		if (seconds > 255)
-		{
-			seconds = 255;
-		}
-		
-		seconds = 255 - seconds;
-		seconds <<= 24;
-		long lives = cpu.getMem().read(0x2e);
-		System.out.println("Remaining lives = " + lives);
-		lives <<= 32;
-		
-		long gameScore = gameScore();
-		long delta = gameScore - previousScore;
-		if (delta < 0)
-		{
-			delta = 0;
-		}
-		
-		System.out.println("Score in this level = " + delta);
-		previousScore = gameScore;
-		return lives + seconds + delta;
-	}
-	
-	private long partialScore()
-	{
-		System.out.println("Processing partial screen");
-		long seconds = 0;
-		long lives = 0;
-		
-		long gameScore = gameScore();
-		long delta = gameScore - previousScore;
-		if (delta < 0)
-		{
-			delta = 0;
-		}
-		
-		System.out.println("Score in this level = " + delta);
-		return lives + seconds + delta;
-	}
-	
 	private long gameScore()
 	{
 		long retval = 0;
-		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44a].read());
-		if (val != 0x27)
-		{
-			retval += val;
-		}
-		
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x449].read());
-		if (val != 0x27)
-		{
-			retval += (val * 10);
-		}
-		
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x448].read());
-		if (val != 0x27)
-		{
-			retval += (val * 100);
-		}
-		
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x447].read());
-		if (val != 0x27)
-		{
-			retval += (val * 1000);
-		}
-		
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x446].read());
-		if (val != 0x27)
-		{
-			retval += (val * 10000);
-		}
-		
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x445].read());
-		if (val != 0x27)
-		{
-			retval += (val * 100000);
-		}
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44].read());
+		retval += val;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x45].read());
+		retval += val * 100;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x46].read());
+		retval += val * 10000;
 		
 		return retval;
-	}
-	
-	private boolean processScreenResults(ArrayList<ControllerEvent> events)
-	{
-		boolean retval = false;
-		for (int i = 0; i < screenScores.size(); ++i)
-		{
-			if (i < bestScreenScores.size())
-			{
-				if (screenScores.get(i) > bestScreenScores.get(i))
-				{
-					retval = true;
-					System.out.println("Screen " + i + " had a new best score of " + screenScores.get(i) + " old best was " + bestScreenScores.get(i));
-					bestScreenScores.set(i, screenScores.get(i));
-					long start = screenStartTimes.get(i);
-					long end = screenEndTimes.get(i);
-			
-					bestScreenControls.set(i, getControls(start, end, events));
-					bestScreenStartTimes.set(i, start);
-					bestScreenEndTimes.set(i, end);
-					bestScreenStartButtonStates.set(i, screenStartButtonStates.get(i));
-				}
-			}
-			else
-			{
-				retval = true;
-				System.out.println("Screen " + i + " was never played before. Got a score of " + screenScores.get(i));
-				bestScreenScores.add(screenScores.get(i));
-				long start = screenStartTimes.get(i);
-				long end = screenEndTimes.get(i);
-				
-				bestScreenControls.add(getControls(start, end, events));
-				bestScreenStartTimes.add(start);
-				bestScreenEndTimes.add(end);
-				bestScreenStartButtonStates.add(screenStartButtonStates.get(i));
-			}
-		}
-		
-		return retval;
-	}
-	
-	private ArrayList<ControllerEvent> getControls(long start, long end, ArrayList<ControllerEvent> events)
-	{
-		ArrayList<ControllerEvent> retval = new ArrayList<ControllerEvent>();
-		for (ControllerEvent event : events)
-		{
-			if (event.getCycle() < start)
-			{
-				continue;
-			} else if (event.getCycle() <= end)
-			{
-				retval.add(event);
-			} else 
-			{
-				break;
-			}
-		}
-		
-		return retval;
-	}
-	
-	private ArrayList<ControllerEvent> combineBest(ArrayList<ControllerEvent> eventList)
-	{
-		ArrayList<ControllerEvent> retval = new ArrayList<ControllerEvent>();
-		for (ControllerEvent event : eventList)
-		{
-			if (event.getCycle() < firstUsableCycle)
-			{
-				retval.add(event);
-			}
-			else
-			{
-				break;
-			}
-		}
-		
-		long currentTime = firstUsableCycle;
-		long push = 0;
-		for (int i = 0; i < bestScreenScores.size(); ++i)
-		{
-			push = currentTime - bestScreenStartTimes.get(i);
-			
-			retval = forceButtonStates(bestScreenStartButtonStates.get(i), bestScreenStartTimes.get(i) + push, retval);
-			for (ControllerEvent event : bestScreenControls.get(i))
-			{
-				retval.add(new ControllerEvent(event.getCycle() + push, event.getDown(), event.getCode()));
-			}
-			
-			currentTime = bestScreenEndTimes.get(i) + push;
-			retval = allButtonsOff(currentTime, retval);
-		}
-		
-		return retval;
-	}
-	
-	private ArrayList<ControllerEvent> forceButtonStates(int state, long cycle, ArrayList<ControllerEvent> events)
-	{
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 7), KeyEvent.VK_S));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 6), KeyEvent.VK_A));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 5), KeyEvent.VK_UP));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 4), KeyEvent.VK_DOWN));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 3), KeyEvent.VK_LEFT));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 2), KeyEvent.VK_RIGHT));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 1), KeyEvent.VK_ENTER));
-		events.add(new ControllerEvent(cycle, Utils.getBit(state, 0), KeyEvent.VK_SPACE));
-		return events;
-	}
-	
-	private ArrayList<ControllerEvent> allButtonsOff(long cycle, ArrayList<ControllerEvent> events)
-	{
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_S));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_A));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_UP));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_DOWN));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_LEFT));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_RIGHT));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_ENTER));
-		events.add(new ControllerEvent(cycle, false, KeyEvent.VK_SPACE));
-		return events;
 	}
 	
 	private ArrayList<ControllerEvent> addRandomEvents(ArrayList<ControllerEvent> events)
 	{
 		long first = events.get(events.size() - 1).getCycle() + 1;
+		if (first < firstUsableCycle)
+		{
+			first = firstUsableCycle;
+		}
+		
 		long totalModfiableTime = first;
 		
 		int numMods = (int)(totalModfiableTime / 500000);
@@ -753,13 +510,15 @@ public class BubbleBobbleAi implements AiAgent {
 			long cycle = first + offset;
 		
 			int randVal = Math.abs(ThreadLocalRandom.current().nextInt());
-			int key = randVal % 4;
+			int key = randVal % 7;
 
 			if (key == 0)
 			{
 				if (modType == 1)
 				{
 					events = addEvent(cycle, false, KeyEvent.VK_RIGHT, events);
+					events = addEvent(cycle, false, KeyEvent.VK_UP, events);
+					events = addEvent(cycle, false, KeyEvent.VK_DOWN, events);
 				}
 				
 				key =  KeyEvent.VK_LEFT;
@@ -768,14 +527,60 @@ public class BubbleBobbleAi implements AiAgent {
 				if (modType == 1)
 				{
 					events = addEvent(cycle, false, KeyEvent.VK_LEFT, events);
+					events = addEvent(cycle, false, KeyEvent.VK_UP, events);
+					events = addEvent(cycle, false, KeyEvent.VK_DOWN, events);
 				}
 				
 				key =  KeyEvent.VK_RIGHT;
 			} else if (key == 2)
-			{	
-				key =  KeyEvent.VK_S;
+			{
+				if (modType == 1)
+				{
+					events = addEvent(cycle, false, KeyEvent.VK_LEFT, events);
+					events = addEvent(cycle, false, KeyEvent.VK_RIGHT, events);
+					events = addEvent(cycle, false, KeyEvent.VK_DOWN, events);
+				}
+				
+				key =  KeyEvent.VK_UP;
 			} else if (key == 3)
+			{
+				if (modType == 1)
+				{
+					events = addEvent(cycle, false, KeyEvent.VK_LEFT, events);
+					events = addEvent(cycle, false, KeyEvent.VK_UP, events);
+					events = addEvent(cycle, false, KeyEvent.VK_RIGHT, events);
+				}
+				
+				key =  KeyEvent.VK_DOWN;
+			} 
+			else if (key == 4)
 			{	
+				if (modType == 1)
+				{
+					events = addEvent(cycle, false, KeyEvent.VK_A, events);
+				}
+				
+				key =  KeyEvent.VK_S;
+			} else if (key == 5)
+			{
+				if (modType == 1)
+				{
+					events = addEvent(cycle, false, KeyEvent.VK_S, events);
+				}
+				
+				key =  KeyEvent.VK_A;
+			} else
+			{
+				if (modType == 1)
+				{
+					events = addEvent(cycle, true, KeyEvent.VK_S, events);
+					events = addEvent(cycle + 400000, false, KeyEvent.VK_S, events);
+				}
+				else
+				{
+					events = addEvent(cycle, false, KeyEvent.VK_S, events);
+				}
+				
 				key =  KeyEvent.VK_A;
 			}
 			
@@ -811,44 +616,9 @@ public class BubbleBobbleAi implements AiAgent {
 				state = newState;
 				retval.add(event);
 			}
-			
-			if (invalidState(state))
-			{
-				retval.addAll(fixState(state, event.getCycle()));
-				state = fixedState(state);
-			}
 		}
 		
 		return retval;
-	}
-	
-	private boolean invalidState(int state)
-	{
-		return Utils.getBit(state, 3) && Utils.getBit(state, 2);
-	}
-	
-	private ArrayList<ControllerEvent> fixState(int state, long cycle)
-	{
-		ArrayList<ControllerEvent> retval = new ArrayList<ControllerEvent>();
-		if (Utils.getBit(state, 3))
-		{
-			if (Utils.getBit(state, 2))
-			{
-				retval.add(new ControllerEvent(cycle, false, KeyEvent.VK_RIGHT));
-			}
-		}
-		
-		return retval;
-	}
-	
-	private int fixedState(int state)
-	{
-		if (Utils.getBit(state, 3) && Utils.getBit(state, 2))
-		{
-			state = Utils.clearBit(state, 2);
-		}
-		
-		return state;
 	}
 	
 	private int updateState(int state, ControllerEvent event)

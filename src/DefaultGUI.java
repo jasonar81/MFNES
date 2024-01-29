@@ -34,12 +34,12 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	protected volatile int[] imgData = new int[280 * 240];
 	protected JPanel panel;
 	protected BufferStrategy strategy;
-	private AtomicInteger width;
-	private AtomicInteger height;
-	private AtomicInteger x;
-	private AtomicInteger y;
+	protected AtomicInteger width;
+	protected AtomicInteger height;
+	protected AtomicInteger x;
+	protected AtomicInteger y;
 	private Color black;
-	private AtomicBoolean swap;
+	protected AtomicBoolean swap;
 	
 	private volatile boolean left = false;
 	private volatile boolean right = false;
@@ -60,7 +60,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	private CPU cpu;
 	private PrintWriter recordLog;
 	private volatile boolean record;
-	private volatile boolean playback;
+	protected volatile boolean playback;
 	private ArrayList<ControllerEvent> queue = new ArrayList<ControllerEvent>();
 	private int queueIndex = 0;
 	private long cycleOffset;
@@ -68,7 +68,6 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	
 	protected volatile boolean terminate = false;
 	protected AiAgent agent = null;
-	private long maxWait = 0;
 	
 	public DefaultGUI()
 	{
@@ -146,16 +145,8 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 
 	@Override
 	public void swapBuffers() {
-		long counter = 0;
 		while (swap.get()) 
 		{
-			++counter;
-		}
-		
-		if (counter > maxWait)
-		{
-			maxWait = counter;
-			System.out.println("New max wait in the GUI of " + maxWait);
 		}
 		
 		swap.set(true);
@@ -163,8 +154,6 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 
 	@Override
 	public void run() {
-		long frames = 0;
-		long start = 0;
 		while (true)
 		{
 			if (terminate)
@@ -191,12 +180,6 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 				}
 			}
 			
-			if (start == 0)
-			{
-				start = System.currentTimeMillis();
-			}
-			
-			++frames;
 			if (g != null)
 			{
 				img.getRaster().setDataElements(0, 0, 280, 240, imgData);
@@ -220,14 +203,6 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 					strategy.show();
 				}
 			}
-			//else
-			{
-				if (frames % 1024 == 0)
-				{
-					long end = System.currentTimeMillis();
-					System.out.println("FPS = " + (frames / ((end - start) / 1000.0)));
-				}
-			}
 			
 			if (playback)
 			{
@@ -236,7 +211,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 		}
 	}
 	
-	private void runPlayback(long cycle)
+	protected void runPlayback(long cycle)
 	{
 		while (queueIndex < queue.size())
 		{

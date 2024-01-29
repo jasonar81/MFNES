@@ -37,9 +37,9 @@ public class ContraAi3 implements AiAgent {
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 40000;
-	private int layerSize = 512;
-	private int numLayers = 3;
+	private long numControllerRequests = 10000;
+	private int layerSize = 8;
+	private int numLayers = 1;
 	
 	public static void main(String[] args)
 	{
@@ -84,14 +84,9 @@ public class ContraAi3 implements AiAgent {
 			saveNet();
 		}
 		
-		boolean doUpdate = true;
 		while (true)
 		{
-			if (doUpdate)
-			{
-				net.updateParameters();
-			}
-			
+			net.updateParameters();
 			setup();
 			load("contra.nes");
 			makeModifications();
@@ -107,7 +102,7 @@ public class ContraAi3 implements AiAgent {
 			processScreenResults();
 	
 			teardown();
-			if (!doUpdate || score > highScore)
+			if (score > highScore)
 			{
 				highScore = score;
 				System.out.println("New high score!");
@@ -116,13 +111,10 @@ public class ContraAi3 implements AiAgent {
 				{
 					numControllerRequests *= 2;
 				}
-				
-				doUpdate = !doUpdate;
 			}
 			else
 			{
 				net.revertParameters();
-				doUpdate = true;
 			}
 		}
 	}

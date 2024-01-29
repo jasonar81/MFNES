@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 public class Memory {
@@ -20,6 +21,11 @@ public class Memory {
 	private GUI gui;
 	private volatile int control = 0;
 	private String filename = "";
+	
+	private ArrayList<Integer> genieAddresses = new ArrayList<Integer>();
+	private ArrayList<Byte> genieReturnValues = new ArrayList<Byte>();
+	private ArrayList<Boolean> genieUnconditional = new ArrayList<Boolean>();
+	private ArrayList<Byte> genieCompare = new ArrayList<Byte>();
 	
 	public Memory(int type, PPU ppu, GUI gui)
 	{
@@ -61,7 +67,40 @@ public class Memory {
 	
 	public synchronized int read(int address)
 	{
-		return Byte.toUnsignedInt(layout[address].read());
+		byte temp = layout[address].read();
+		
+		for (int i = 0; i < genieAddresses.size(); ++i)
+		{
+			if (address == genieAddresses.get(i))
+			{
+				if (genieUnconditional.get(i))
+				{
+					temp = genieReturnValues.get(i);
+				}
+				else if (temp == genieCompare.get(i))
+				{
+					temp = genieReturnValues.get(i);
+				}
+			}
+		}
+		
+		return Byte.toUnsignedInt(temp);
+	}
+	
+	public void addGenie(int address, boolean unconditional, byte compare, byte retval)
+	{
+		genieAddresses.add(address);
+		genieUnconditional.add(unconditional);
+		genieCompare.add(compare);
+		genieReturnValues.add(retval);
+		if (unconditional)
+		{
+			System.out.println("Always read " + String.format("0x%02X", retval) + " from " + String.format("0x%04X", address));
+		}
+		else
+		{
+			System.out.println("Read " + String.format("0x%02X", retval) + " from " + String.format("0x%04X", address) + " if current value is " + String.format("0x%02X", compare));
+		}
 	}
 	
 	public synchronized int[] getAllMemory()
@@ -76,6 +115,17 @@ public class Memory {
 		for (int i = 0x8000; i < MEMSIZE; ++i)
 		{
 			retval[x++] = layout[i].read();
+		}
+		
+		return retval;
+	}
+	
+	public synchronized int[] getAllRam()
+	{
+		int[] retval = new int[0x800];
+		for (int i = 0; i < 0x800; ++i)
+		{
+			retval[i] = layout[i].read();
 		}
 		
 		return retval;
@@ -147,6 +197,13 @@ public class Memory {
 		} else if (cart.mapper() == 10)
 		{
 			mapper10Ppu();
+		} else if (cart.mapper() == 0xfffe)
+		{
+			mapperfffePpu();
+		} 
+		else if (cart.mapper() == 0xffff)
+		{
+			mapperffffPpu();
 		}
 		
 		for (int i = 0x3000; i < 0x3f00; ++i)
@@ -258,6 +315,13 @@ public class Memory {
 		} else if (cart.mapper() == 206)
 		{
 			mapper206();
+		} else if (cart.mapper() == 0xfffe)
+		{
+			mapperfffe();
+		} 
+		else if (cart.mapper() == 0xffff)
+		{
+			mapperffff();
 		}
 		else
 		{
@@ -266,6 +330,30 @@ public class Memory {
 				System.out.println("Mapper " + cart.mapper() + " is not yet supported");
 			}
 		}
+		
+		//layout[0x50] = new MonitorMemoryPort(0x50);
+		//layout[0x51] = new MonitorMemoryPort(0x51);
+		//layout[0x52] = new MonitorMemoryPort(0x52);
+		//layout[0x53] = new MonitorMemoryPort(0x53);
+		//layout[0x54] = new MonitorMemoryPort(0x54);
+		//layout[0x55] = new MonitorMemoryPort(0x55);
+		//layout[0x56] = new MonitorMemoryPort(0x56);
+		//layout[0x57] = new MonitorMemoryPort(0x57);
+		//layout[0x58] = new MonitorMemoryPort(0x58);
+		//layout[0x59] = new MonitorMemoryPort(0x59);
+		//layout[0x5a] = new MonitorMemoryPort(0x5a);
+		//layout[0x5b] = new MonitorMemoryPort(0x5b);
+		//layout[0x5c] = new MonitorMemoryPort(0x5c);
+		//layout[0x5d] = new MonitorMemoryPort(0x5d);
+		//layout[0x5e] = new MonitorMemoryPort(0x5e);
+		//layout[0x5f] = new MonitorMemoryPort(0x5f);
+		
+		/*
+		for (int i = 0x50; i < 0x60; ++i)
+		{
+			layout[i] = new MonitorMemoryPort(i);
+		}
+		*/
 	}
 	
 	private void mapper0()
@@ -318,7 +406,7 @@ public class Memory {
 			{
 				for (int i = 0xc000; i < MEMSIZE; ++i)
 				{
-					layout[i] = new RedirectMemoryPort(i & 0x3fff, this);
+					layout[i] = new RedirectMemoryPort((i & 0x3fff) + 0x8000, this);
 				}
 			}
 		}
@@ -694,6 +782,58 @@ public class Memory {
 		}
 	}
 	
+	private void mapperfffe()
+	{
+		loadRomAtAddress(cart.prgData(), 0x8000, 0, 16384);
+		loadRomAtAddress(cart.prgData(), 0xc000, cart.prgData().length - 16384, 16384);
+		
+		for (int i = 0x8000; i < 0xa000; ++i)
+		{
+			layout[i] = new MapperfffeBankSelect1(this, layout[i], false);
+		}
+		
+		for (int i = 0xa000; i < 0xc000; ++i)
+		{
+			layout[i] = new MapperfffeBankSelect1(this, layout[i], true);
+		}
+		
+		for (int i = 0xc000; i < 0xe000; ++i)
+		{
+			layout[i] = new MapperfffeBankSelect2(this, layout[i], false);
+		}
+		
+		for (int i = 0xe000; i < MEMSIZE; ++i)
+		{
+			layout[i] = new MapperfffeBankSelect2(this, layout[i], true);
+		}
+	}
+	
+	private void mapperffff()
+	{
+		loadRomAtAddress(cart.prgData(), 0x8000, 0, 16384);
+		loadRomAtAddress(cart.prgData(), 0xc000, cart.prgData().length - 16384, 16384);
+		
+		for (int i = 0x8000; i < 0xa000; ++i)
+		{
+			layout[i] = new MapperffffBankSelect1(this, layout[i], false);
+		}
+		
+		for (int i = 0xa000; i < 0xc000; ++i)
+		{
+			layout[i] = new MapperffffBankSelect1(this, layout[i], true);
+		}
+		
+		for (int i = 0xc000; i < 0xe000; ++i)
+		{
+			layout[i] = new MapperffffBankSelect2(this, layout[i], false);
+		}
+		
+		for (int i = 0xe000; i < MEMSIZE; ++i)
+		{
+			layout[i] = new MapperffffBankSelect2(this, layout[i], true);
+		}
+	}
+	
 	private void mapper0Ppu()
 	{
 		if (cart.chrData().length > 0)
@@ -905,6 +1045,22 @@ public class Memory {
 		control = 3;
 	}
 	
+	private void mapperfffePpu()
+	{
+		if (cart.chrData().length > 0)
+		{
+			loadRamAtAddress(cart.chrData(), 0, 0, 16384);
+		}
+	}
+	
+	private void mapperffffPpu()
+	{
+		if (cart.chrData().length > 0)
+		{
+			loadRamAtAddress(cart.chrData(), 0, 0, 8192);
+		}
+	}
+	
 	public synchronized void loadRomAtAddress(byte[] data, int addr, int offset, int len)
 	{
 		if (data.length > 0)
@@ -1022,6 +1178,30 @@ public class Memory {
 			{
 				((Mapper206BankSelect1)layout[addr + i]).updateDelegate(data[offset + i]);
 				((Mapper206BankSelect2)layout[addr + i]).updateDelegate(data[offset + i]);
+			}
+		}
+	}
+	
+	public synchronized void loadRomAtAddressMapperfffe(byte[] data, int addr, int offset, int len)
+	{
+		if (data.length > 0)
+		{
+			offset %= data.length;
+			for (int i = 0; i < len; ++i)
+			{
+				((MapperfffeBankSelect2)layout[addr + i]).updateDelegate(data[offset + i]);
+			}
+		}
+	}
+	
+	public synchronized void loadRomAtAddressMapperffff(byte[] data, int addr, int offset, int len)
+	{
+		if (data.length > 0)
+		{
+			offset %= data.length;
+			for (int i = 0; i < len; ++i)
+			{
+				((MapperffffBankSelect1)layout[addr + i]).updateDelegate(data[offset + i]);
 			}
 		}
 	}

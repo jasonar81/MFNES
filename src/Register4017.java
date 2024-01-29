@@ -77,7 +77,11 @@ public class Register4017 implements MemoryPort {
 		
 		if (Utils.getBit(x, 6))
 		{
-			apu.clearFrameInterruptFlag();
+			apu.setDisableFrameInterrupt(true);
+		}
+		else
+		{
+			apu.setDisableFrameInterrupt(false);
 		}
 	}
 	

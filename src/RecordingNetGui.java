@@ -88,7 +88,7 @@ public class RecordingNetGui extends NetGui {
 			glob = outputFilename.substring(0, index+1) + "*" + outputFilename.substring(index+1) + ".jpg";
 		}
 		
-		String cmd = "ffmpeg -framerate 60 -pattern_type glob -i '" + glob + "' -c:v libx264 -pix_fmt yuv420p " + outputFilename + ".tmp.mp4"; 
+		String cmd = "ffmpeg -y -framerate 60 -pattern_type glob -i '" + glob + "' -c:v libx264 -pix_fmt yuv420p " + outputFilename + ".tmp.mp4"; 
 		Process p;
 		
 		try {
@@ -113,7 +113,7 @@ public class RecordingNetGui extends NetGui {
 			e.printStackTrace();
 		}
 		
-		cmd = "ffmpeg -i " + outputFilename + ".tmp.mp4" + " -vf scale=960:720 " + outputFilename;
+		cmd = "ffmpeg -y -i " + outputFilename + ".tmp.mp4" + " -vf scale=960:720 " + outputFilename;
 		
 		try {
 			p = Runtime.getRuntime().exec(new String[]{"sh", "-c", cmd});
