@@ -21,6 +21,7 @@ public class ControllerNeuralNet {
 	private int paramNumToUpdate = 0;
 	private boolean direction = false;
 	private int updatesInARow = 0;
+	private ArrayList<Integer> interestingAddresses = null;
 	
 	public void reset()
 	{
@@ -84,6 +85,12 @@ public class ControllerNeuralNet {
 			initParameters();
 			numParametersSet = numParameters();
 		}
+	}
+	
+	public void setInterestingAddresses(ArrayList<Integer> interestingAddresses)
+	{
+		this.interestingAddresses = interestingAddresses;
+		paramNumToUpdate = interestingAddresses.get(0);
 	}
 	
 	public boolean hasMoreSetup()
@@ -178,22 +185,57 @@ public class ControllerNeuralNet {
 	
 	private int nextParamNum(int x)
 	{
-		if (x == numParameters())
+		if (x == numParameters() - 1)
 		{
-			return 0;
+			return firstInterestingAddress();
 		}
+		
 		if (x < 0x800 * (layerSize - 1))
 		{
 			return x + 0x800;
 		}
 		else if (x < 0x800 * layerSize)
 		{
-			return (x % 0x800) + 1;
+			//When there are no more, this needs to return 0x800 * layerSize
+			return nextInterestingAddress(x % 0x800); 
 		}
 		else
 		{
 			return x + 1;
 		}
+	}
+	
+	private int firstInterestingAddress()
+	{
+		if (interestingAddresses == null)
+		{
+			return 0;
+		}
+		
+		return interestingAddresses.get(0);
+	}
+	
+	private int nextInterestingAddress(int x)
+	{
+		if (interestingAddresses == null)
+		{
+			if (x + 1 != 0x800)
+			{
+				return x + 1;
+			}
+			
+			return 0x800 * layerSize;
+		}
+		
+		for (int i = 0; i < interestingAddresses.size() - 1; ++i)
+		{
+			if (interestingAddresses.get(i) == x)
+			{
+				return interestingAddresses.get(i+1);
+			}
+		}
+		
+		return 0x800 * layerSize;
 	}
 	
 	public void revertParameters()
@@ -227,6 +269,64 @@ public class ControllerNeuralNet {
 				if (i == 0)
 				{
 					parameters[i][j] = 0;
+				}
+				else if (i == parameters.length - 1)
+				{
+					if ((j % layerSize) ==  (j / layerSize))
+					{
+						parameters[i][j] = 1;
+					}
+					else
+					{
+						parameters[i][j] = 0;
+					}
+				}
+				else
+				{
+					parameters[i][j] = 1;
+				}
+			}
+		}
+	}
+	
+	private boolean isInterestingAddress(int x)
+	{
+		if (interestingAddresses == null)
+		{
+			return true;
+		}
+		
+		for (int i = 0; i < interestingAddresses.size(); ++i)
+		{
+			if (interestingAddresses.get(i) == x)
+			{
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	public void randomInit()
+	{	
+		for (int i = 0; i < parameters.length; ++i)
+		{
+			for (int j = 0; j < parameters[i].length; ++j)
+			{
+				if (i == 0)
+				{
+					if (isInterestingAddress(j))
+					{
+						parameters[i][j] = Math.abs(ThreadLocalRandom.current().nextInt()) % 2;
+						if (parameters[i][j] == 0)
+						{
+							parameters[i][j] = -1;
+						}
+					}
+					else
+					{
+						parameters[i][j] = 0;
+					}
 				}
 				else if (i == parameters.length - 1)
 				{
