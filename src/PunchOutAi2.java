@@ -35,9 +35,9 @@ public class PunchOutAi2 implements AiAgent {
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 40000;
-	private int layerSize = 8;
-	private int numLayers = 1;
+	private long numControllerRequests = 320000;
+	private int layerSize = 18;
+	private int numLayers = 3;
 	
 	public static void main(String[] args)
 	{
@@ -51,6 +51,7 @@ public class PunchOutAi2 implements AiAgent {
 		if (!loadNet())
 		{
 			 net = new ControllerNeuralNet(true, layerSize, numLayers, true);
+			 net.randomInit();
 		}
 		else
 		{

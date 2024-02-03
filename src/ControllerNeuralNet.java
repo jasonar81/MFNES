@@ -15,18 +15,15 @@ public class ControllerNeuralNet {
 	private boolean memoryBased;
 	private int displaySize = 280 * 240;
 	private GUI gui;
-	private long previousCycle = 0;
-	private int previousState = 0;
 	private boolean allButtons = false;
 	private int paramNumToUpdate = 0;
-	private boolean direction = false;
-	private int updatesInARow = 0;
-	private ArrayList<Integer> interestingAddresses = null;
+	int[] temp;
+	private int currentState = 0;
+	private int currentFrame = 0;;
 	
 	public void reset()
 	{
-		previousCycle = 0;
-		previousState = 0;
+		
 	}
 	
 	public ControllerNeuralNet(boolean allButtons, int layerSize, int numLayers, boolean init, boolean flag)
@@ -85,12 +82,6 @@ public class ControllerNeuralNet {
 			initParameters();
 			numParametersSet = numParameters();
 		}
-	}
-	
-	public void setInterestingAddresses(ArrayList<Integer> interestingAddresses)
-	{
-		this.interestingAddresses = interestingAddresses;
-		paramNumToUpdate = interestingAddresses.get(0);
 	}
 	
 	public boolean hasMoreSetup()
@@ -169,95 +160,35 @@ public class ControllerNeuralNet {
 		
 		oldValue = getParameter(paramNumToUpdate);
 		int newValue = oldValue;
-		if (direction)
+		int delta = ThreadLocalRandom.current().nextInt();
+		boolean negative = (delta < 0);
+		delta = Math.abs(delta);
+		delta %= 256;
+		if (negative)
 		{
-			++newValue;
+			delta *= -1;
 		}
-		else
-		{
-			--newValue;
-		}
+		
+		newValue += delta;
 		
 		setParameter(newValue, paramNumToUpdate);
 		System.out.println("Setting parameter " + paramNumToUpdate + " to " + newValue);
-		++updatesInARow;
 	}
 	
 	private int nextParamNum(int x)
 	{
 		if (x == numParameters() - 1)
 		{
-			return firstInterestingAddress();
-		}
-		
-		if (x < 0x800 * (layerSize - 1))
-		{
-			return x + 0x800;
-		}
-		else if (x < 0x800 * layerSize)
-		{
-			//When there are no more, this needs to return 0x800 * layerSize
-			return nextInterestingAddress(x % 0x800); 
-		}
-		else
-		{
-			return x + 1;
-		}
-	}
-	
-	private int firstInterestingAddress()
-	{
-		if (interestingAddresses == null)
-		{
 			return 0;
 		}
 		
-		return interestingAddresses.get(0);
-	}
-	
-	private int nextInterestingAddress(int x)
-	{
-		if (interestingAddresses == null)
-		{
-			if (x + 1 != 0x800)
-			{
-				return x + 1;
-			}
-			
-			return 0x800 * layerSize;
-		}
-		
-		for (int i = 0; i < interestingAddresses.size() - 1; ++i)
-		{
-			if (interestingAddresses.get(i) == x)
-			{
-				return interestingAddresses.get(i+1);
-			}
-		}
-		
-		return 0x800 * layerSize;
+		return x + 1;
 	}
 	
 	public void revertParameters()
 	{
 		setParameter(oldValue, paramNumToUpdate);
-		
-		if (updatesInARow >= 2)
-		{
-			direction = false;
-			paramNumToUpdate = nextParamNum(paramNumToUpdate);
-		}
-		else if (!direction)
-		{
-			direction = true;
-		}
-		else
-		{
-			direction = false;
-			paramNumToUpdate = nextParamNum(paramNumToUpdate);
-		}
-		
-		updatesInARow = 0;
+		paramNumToUpdate = nextParamNum(paramNumToUpdate);
 	}
 	
 	private void initParameters()
@@ -289,59 +220,27 @@ public class ControllerNeuralNet {
 		}
 	}
 	
-	private boolean isInterestingAddress(int x)
-	{
-		if (interestingAddresses == null)
-		{
-			return true;
-		}
-		
-		for (int i = 0; i < interestingAddresses.size(); ++i)
-		{
-			if (interestingAddresses.get(i) == x)
-			{
-				return true;
-			}
-		}
-		
-		return false;
-	}
-	
 	public void randomInit()
 	{	
 		for (int i = 0; i < parameters.length; ++i)
 		{
 			for (int j = 0; j < parameters[i].length; ++j)
 			{
-				if (i == 0)
+				parameters[i][j] = ThreadLocalRandom.current().nextInt();
+			}
+		}
+		
+		for (int i = 0; i < parameters.length; ++i)
+		{
+			for (int j = 0; j < parameters[i].length; ++j)
+			{
+				parameters[i][j] = ThreadLocalRandom.current().nextInt();
+				boolean positive = (parameters[i][j] >= 0);
+				parameters[i][j] = Math.abs(parameters[i][j]);
+				parameters[i][j] %= (256*256);
+				if (!positive)
 				{
-					if (isInterestingAddress(j))
-					{
-						parameters[i][j] = Math.abs(ThreadLocalRandom.current().nextInt()) % 2;
-						if (parameters[i][j] == 0)
-						{
-							parameters[i][j] = -1;
-						}
-					}
-					else
-					{
-						parameters[i][j] = 0;
-					}
-				}
-				else if (i == parameters.length - 1)
-				{
-					if ((j % layerSize) ==  (j / layerSize))
-					{
-						parameters[i][j] = 1;
-					}
-					else
-					{
-						parameters[i][j] = 0;
-					}
-				}
-				else
-				{
-					parameters[i][j] = 1;
+					parameters[i][j] *= -1;
 				}
 			}
 		}
@@ -369,7 +268,12 @@ public class ControllerNeuralNet {
 			inputSize = displaySize;
 		}
 		
-		int[] temp = new int[layerSize];
+		run(mem, inputSize, numButtons);
+	}
+	
+	private void run(int[] mem, int inputSize, int numButtons)
+	{	
+		temp = new int[layerSize];
 		//Run first layer
 		for (int i = 0; i < layerSize; ++i)
 		{
@@ -428,9 +332,10 @@ public class ControllerNeuralNet {
 	
 	public int getButtonState(long cycle)
 	{
-		if (cycle - previousCycle < 400000)
+		int frame = (int)(cycle / (5 * 341 * 261));
+		if (frame == currentFrame)
 		{
-			return previousState;
+			return currentState;
 		}
 		
 		run();
@@ -478,9 +383,8 @@ public class ControllerNeuralNet {
 			}
 		}
 		
-		previousState = state;
-		previousCycle = cycle;
-		//System.out.println("State = " + state);
+		currentFrame = frame;
+		currentState = state;
 		return state;
 	}
 }

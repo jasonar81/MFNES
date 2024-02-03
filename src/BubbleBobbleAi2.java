@@ -35,8 +35,8 @@ public class BubbleBobbleAi2 implements AiAgent {
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private ControllerNeuralNet net;
 	private long numControllerRequests = 200000;
-	private int layerSize = 8;
-	private int numLayers = 1;
+	private int layerSize = 18;
+	private int numLayers = 3;
 	
 	public static void main(String[] args)
 	{
@@ -50,6 +50,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 		if (!loadNet())
 		{
 			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
+			 net.randomInit();
 		}
 		else
 		{

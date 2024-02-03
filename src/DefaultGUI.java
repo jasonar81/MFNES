@@ -49,7 +49,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	private volatile boolean start = false;
 	private volatile boolean a = false;
 	private volatile boolean b = false;
-	private volatile long totalBPresses = 0;
+	protected volatile long totalBPresses = 0;
 	
 	protected SourceDataLine audio;
 	private byte[] audioBuffer = new byte[8192];

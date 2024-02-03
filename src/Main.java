@@ -129,6 +129,9 @@ public class Main {
 		{
 			genie(command.substring(6).trim());
 		}
+		else if (command.startsWith("train ")) {
+			train(command.substring(6));
+		}
 		else
 		{
 			synchronized(System.out) 
@@ -511,6 +514,11 @@ public class Main {
 	private static void record(String filename)
 	{
 		gui.record(filename);
+	}
+	
+	private static void train(String filename)
+	{
+		((Register4016)cpu.getMem().getLayout()[0x4016]).enableLogging(filename);
 	}
 	
 	private static void playRecording(String filename)
