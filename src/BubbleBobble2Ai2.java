@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class DoubleDragonAi2 implements AiAgent {
+public class BubbleBobble2Ai2 implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -26,19 +26,18 @@ public class DoubleDragonAi2 implements AiAgent {
 	private volatile boolean startedDone;
 	private volatile long score;
 	private volatile long livesLost;
-	private volatile long totalTime;
 	
-	private static DoubleDragonAi2 instance;
+	private static BubbleBobble2Ai2 instance;
 	
-	private long firstUsableCycle = 102186813;
+	private long firstUsableCycle = 43610975;
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 5000;
+	private long numControllerRequests = 80000;
 	private int layerSize = 18;
 	private int numLayers = 3;
 	
 	public static void main(String[] args)
 	{
-		instance = new DoubleDragonAi2();
+		instance = new BubbleBobble2Ai2();
 		instance.main();
 	}
 	
@@ -57,7 +56,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		}
 		
 		setup();
-		load("double_dragon.nes", "sav");
+		load("bubble_bobble2.nes", "sav");
 		makeModifications();
 		net.reset();
 		net.setCpuMem(cpuMem);
@@ -83,7 +82,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		{
 			net.updateParameters();
 			setup();
-			load("double_dragon.nes", "sav");
+			load("bubble_bobble2.nes", "sav");
 			makeModifications();
 			net.reset();
 			net.setCpuMem(cpuMem);
@@ -117,7 +116,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		try
 		{
-			FileWriter file = new FileWriter("double_dragon.net");
+			FileWriter file = new FileWriter("bubble_bobble2.net");
 			PrintWriter out = new PrintWriter(file);
 			out.println(net.getParamNumToUpdate());
 			out.println(layerSize);
@@ -142,7 +141,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon.net");
+			File file = new File("bubble_bobble2.net");
 			if (!file.exists())
 			{
 				return false;
@@ -182,15 +181,15 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		livesLost = 0;
 		score = 0;
-		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {14972530, 16019792};
+		long[] startOnOffTimes = new long[] {10065248, 10597358, 25712435, 27011530, 29366968,
+				30748143, 42547579, 43610974};
 		clock = new Clock();
 		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
-		long[] selectTimes = new long[] {10709822, 11276049};
+		long[] selectTimes = new long[] {37087201, 37712636, 40657682, 41310083};
 		((NetGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
@@ -264,7 +263,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x43] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x479] = new NotifyChangesPort(this, clock); //Lives remaining
 	}
 	
 	public void setDone(long totalTime)
@@ -274,7 +273,6 @@ public class DoubleDragonAi2 implements AiAgent {
 			pause();
 			System.out.println("Done");
 			startedDone = true;
-			this.totalTime = totalTime;
 			++livesLost;
 			score = gameScore();
 			finalScore = score;
@@ -300,7 +298,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x43].read() == 0)
+			if (cpu.getMem().getLayout()[0x479].read() == 0)
 			{
 				setDone(cycle);
 				return;
@@ -316,12 +314,16 @@ public class DoubleDragonAi2 implements AiAgent {
 	private long gameScore()
 	{
 		long retval = 0;
-		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44].read());
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x485].read());
 		retval += val;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x45].read());
-		retval += val * 256;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x46].read());
-		retval += val * 256 * 256;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x484].read());
+		retval += val * 10;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x483].read());
+		retval += val * 100;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x482].read());
+		retval += val * 1000;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x481].read());
+		retval += val * 10000;
 		
 		return retval;
 	}

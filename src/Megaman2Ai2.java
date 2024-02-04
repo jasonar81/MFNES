@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class DoubleDragonAi2 implements AiAgent {
+public class Megaman2Ai2 implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -20,25 +20,25 @@ public class DoubleDragonAi2 implements AiAgent {
 	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
-	private volatile double highScore = 0;
-	private volatile double finalScore;
-	private volatile boolean done = false;
+	private volatile long highScore = 0;
+	private volatile boolean done;
 	private volatile boolean startedDone;
 	private volatile long score;
-	private volatile long livesLost;
-	private volatile long totalTime;
 	
-	private static DoubleDragonAi2 instance;
+	private static Megaman2Ai2 instance;
 	
-	private long firstUsableCycle = 102186813;
+	private long firstUsableCycle = 30020224;
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 5000;
+	private long numControllerRequests = 100000;
 	private int layerSize = 18;
 	private int numLayers = 3;
 	
+	private int previousLives = 0;
+	private int previousBossHp = 0;
+	
 	public static void main(String[] args)
 	{
-		instance = new DoubleDragonAi2();
+		instance = new Megaman2Ai2();
 		instance.main();
 	}
 	
@@ -47,7 +47,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
+			 net = new ControllerNeuralNet(true, layerSize, numLayers, true);
 			 net.randomInit();
 		}
 		else
@@ -57,7 +57,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		}
 		
 		setup();
-		load("double_dragon.nes", "sav");
+		load("megaman2.nes", "sav");
 		makeModifications();
 		net.reset();
 		net.setCpuMem(cpuMem);
@@ -65,10 +65,8 @@ public class DoubleDragonAi2 implements AiAgent {
 		
 		while (!done) {}
 		
-		printResults();
-		System.out.println("Score of " + finalScore);
-
-		highScore = finalScore;
+		System.out.println("Score of " + score);
+		highScore = score;
 		System.out.println("New high score!");
 		
 		teardown();
@@ -83,7 +81,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		{
 			net.updateParameters();
 			setup();
-			load("double_dragon.nes", "sav");
+			load("megaman2.nes", "sav");
 			makeModifications();
 			net.reset();
 			net.setCpuMem(cpuMem);
@@ -91,13 +89,11 @@ public class DoubleDragonAi2 implements AiAgent {
 			
 			while (!done) {}
 			
-			printResults();
-			System.out.println("Score of " + finalScore);
-	
+			System.out.println("Score of " + score);
 			teardown();
-			if (finalScore > highScore)
+			if (score > highScore)
 			{
-				highScore = finalScore;
+				highScore = score;
 				System.out.println("New high score!");
 				saveNet();
 				if (numControllerRequests < 300000000)
@@ -117,7 +113,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		try
 		{
-			FileWriter file = new FileWriter("double_dragon.net");
+			FileWriter file = new FileWriter("megaman2.net");
 			PrintWriter out = new PrintWriter(file);
 			out.println(net.getParamNumToUpdate());
 			out.println(layerSize);
@@ -142,7 +138,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon.net");
+			File file = new File("megaman2.net");
 			if (!file.exists())
 			{
 				return false;
@@ -157,7 +153,7 @@ public class DoubleDragonAi2 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
+			net = new ControllerNeuralNet(true, layerSize, numLayers, false);
 			net.setParamNumToUpdate(paramNumToUpdate);
 			
 			int paramNum = 0;
@@ -180,18 +176,18 @@ public class DoubleDragonAi2 implements AiAgent {
 	
 	private void setup()
 	{
-		livesLost = 0;
+		previousLives = 0;
+		previousBossHp = 0;
 		score = 0;
-		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {14972530, 16019792};
 		clock = new Clock();
-		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		
+		long[] startOnOffTimes = new long[] {10890547, 11309846, 14062612, 14921603, 29152813, 30020223};
+		gui = new NetGui(true, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		((NetGui)gui).setRestrictedStart();
 		guiThread = new Thread(gui);
-		long[] selectTimes = new long[] {10709822, 11276049};
-		((NetGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
@@ -240,18 +236,13 @@ public class DoubleDragonAi2 implements AiAgent {
 		ppu.debugHold(false);
 	}
 	
-	private void printResults()
-	{
-		System.out.println("Game score = " + gameScore());
-	}
-	
 	private void on()
 	{
 		ppuThread = new Thread(ppu);
 		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread (apu);
+		apuThread = new Thread(apu);
 		apuThread.setPriority(10);
 		cpu.debugHold(true);
 		ppu.debugHold(true);
@@ -264,22 +255,23 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x43] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0xa8] = new NotifyChangesPort(this, clock); //Detect a death
+		cpu.getMem().getLayout()[0x6c1] = new NotifyChangesPort(this, clock); //Boss HP
 	}
 	
 	public void setDone(long totalTime)
 	{
 		if (!startedDone && !done)
 		{
-			pause();
-			System.out.println("Done");
 			startedDone = true;
-			this.totalTime = totalTime;
-			++livesLost;
-			score = gameScore();
-			finalScore = score;
+			score += getScoreAtDeath();
 			done = true;
 		}
+	}
+	
+	public synchronized void setDeath(long cycle)
+	{
+
 	}
 	
 	private void pause()
@@ -298,36 +290,51 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		pause();
 		
-		if (cycle >= firstUsableCycle)
+		int bossHp = cpu.getMem().getLayout()[0x6c1].read();
+		int lives = cpu.getMem().getLayout()[0xa8].read();
+		if (previousBossHp != bossHp)
 		{
-			if (cpu.getMem().getLayout()[0x43].read() == 0)
+			if (previousBossHp > 0 && bossHp <= 0)
+			{
+				//Defeated boss
+				score += 0xffffff;
+			}
+		}
+		
+		if (previousLives != 0)
+		{
+			//Died
+			if (lives == 0)
 			{
 				setDone(cycle);
 				return;
 			}
 			
-			++livesLost;
-			System.out.println("Died");
+			score += getScoreAtDeath();
 		}
+		
+		previousBossHp = bossHp;
+		previousLives = lives;
 		
 		cont();
 	}
 	
-	private long gameScore()
+	private long getScoreAtDeath()
 	{
-		long retval = 0;
-		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44].read());
-		retval += val;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x45].read());
-		retval += val * 256;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x46].read());
-		retval += val * 256 * 256;
+		long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x20].read());
+		long offset = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x1f].read());
+		long bossHp = cpu.getMem().getLayout()[0x6c1].read();
+		long bossDamage = 0;
+		if (bossHp != 0)
+		{
+			bossDamage = 0x7f - bossHp;
+		}
 		
-		return retval;
-	}
-	
-	@Override
-	public void setDeath(long cycle) {
-		//Easier just to handle in progress()
+		if (bossDamage < 0)
+		{
+			bossDamage = 0;
+		}
+		
+		return (screen << 16) + (bossDamage << 8) + offset;
 	}
 }

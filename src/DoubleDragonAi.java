@@ -485,9 +485,9 @@ public class DoubleDragonAi implements AiAgent {
 		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44].read());
 		retval += val;
 		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x45].read());
-		retval += val * 100;
+		retval += val * 256;
 		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x46].read());
-		retval += val * 10000;
+		retval += val * 256 * 256;
 		
 		return retval;
 	}

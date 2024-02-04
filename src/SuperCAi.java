@@ -455,11 +455,11 @@ public class SuperCAi implements AiAgent {
 		long val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e3].read());
 		retval += val;
 		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e4].read());
-		retval += val * 100;
+		retval += val * 256;
 		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e5].read());
-		retval += val * 10000;
+		retval += val * 256 * 256;
 		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x50].read());
-		retval += val * 1000000;
+		retval += val * 256 * 256 * 256;
 		
 		return retval;
 	}

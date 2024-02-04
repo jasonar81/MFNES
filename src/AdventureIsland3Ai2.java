@@ -8,7 +8,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class DoubleDragonAi2 implements AiAgent {
+public class AdventureIsland3Ai2 implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -26,19 +26,18 @@ public class DoubleDragonAi2 implements AiAgent {
 	private volatile boolean startedDone;
 	private volatile long score;
 	private volatile long livesLost;
-	private volatile long totalTime;
 	
-	private static DoubleDragonAi2 instance;
+	private static AdventureIsland3Ai2 instance;
 	
-	private long firstUsableCycle = 102186813;
+	private long firstUsableCycle = 42326988;
 	private ControllerNeuralNet net;
-	private long numControllerRequests = 5000;
+	private long numControllerRequests = 300000;
 	private int layerSize = 18;
 	private int numLayers = 3;
 	
 	public static void main(String[] args)
 	{
-		instance = new DoubleDragonAi2();
+		instance = new AdventureIsland3Ai2();
 		instance.main();
 	}
 	
@@ -47,7 +46,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		boolean fileExists = false;
 		if (!loadNet())
 		{
-			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
+			 net = new ControllerNeuralNet(true, layerSize, numLayers, true);
 			 net.randomInit();
 		}
 		else
@@ -57,7 +56,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		}
 		
 		setup();
-		load("double_dragon.nes", "sav");
+		load("adventure_island3.nes", "sav");
 		makeModifications();
 		net.reset();
 		net.setCpuMem(cpuMem);
@@ -83,7 +82,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		{
 			net.updateParameters();
 			setup();
-			load("double_dragon.nes", "sav");
+			load("adventure_island3.nes", "sav");
 			makeModifications();
 			net.reset();
 			net.setCpuMem(cpuMem);
@@ -117,7 +116,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		try
 		{
-			FileWriter file = new FileWriter("double_dragon.net");
+			FileWriter file = new FileWriter("adventure_island3.net");
 			PrintWriter out = new PrintWriter(file);
 			out.println(net.getParamNumToUpdate());
 			out.println(layerSize);
@@ -142,7 +141,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon.net");
+			File file = new File("adventure_island3.net");
 			if (!file.exists())
 			{
 				return false;
@@ -157,7 +156,7 @@ public class DoubleDragonAi2 implements AiAgent {
 			numLayers = Integer.parseInt(line);
 			line = in.nextLine();
 			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
+			net = new ControllerNeuralNet(true, layerSize, numLayers, false);
 			net.setParamNumToUpdate(paramNumToUpdate);
 			
 			int paramNum = 0;
@@ -182,16 +181,15 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		livesLost = 0;
 		score = 0;
-		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {14972530, 16019792};
+		long[] startOnOffTimes = new long[] {14926749, 15876563, 21252721, 22065701, 31540991,
+				32753013, 41099303, 42326987};
 		clock = new Clock();
-		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new NetGui(true, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		((NetGui)gui).setRestrictedStart();
 		guiThread = new Thread(gui);
-		long[] selectTimes = new long[] {10709822, 11276049};
-		((NetGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
@@ -264,7 +262,7 @@ public class DoubleDragonAi2 implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x43] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x394] = new NotifyChangesPort(this, clock); //Lives remaining
 	}
 	
 	public void setDone(long totalTime)
@@ -274,7 +272,6 @@ public class DoubleDragonAi2 implements AiAgent {
 			pause();
 			System.out.println("Done");
 			startedDone = true;
-			this.totalTime = totalTime;
 			++livesLost;
 			score = gameScore();
 			finalScore = score;
@@ -300,7 +297,7 @@ public class DoubleDragonAi2 implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x43].read() == 0)
+			if (cpu.getMem().getLayout()[0x394].read() == 0)
 			{
 				setDone(cycle);
 				return;
@@ -316,11 +313,11 @@ public class DoubleDragonAi2 implements AiAgent {
 	private long gameScore()
 	{
 		long retval = 0;
-		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44].read());
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x391].read());
 		retval += val;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x45].read());
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x392].read());
 		retval += val * 256;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x46].read());
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x393].read());
 		retval += val * 256 * 256;
 		
 		return retval;

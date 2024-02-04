@@ -229,10 +229,4 @@ public class GenSmb2Video implements AiAgent {
 		pause();
 		cont();
 	}
-	
-	private long getTimer()
-	{
-		MemoryPort[] layout = cpu.getMem().getLayout();
-		return Byte.toUnsignedLong(layout[0x7fa].read()) + Byte.toUnsignedLong(layout[0x7f9].read()) * 10 + Byte.toUnsignedLong(layout[0x7f8].read()) * 100;
-	}
 }

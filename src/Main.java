@@ -132,6 +132,10 @@ public class Main {
 		else if (command.startsWith("train ")) {
 			train(command.substring(6));
 		}
+		else if (command.startsWith("search 0x"))
+		{
+			search(command.substring(9));
+		}
 		else
 		{
 			synchronized(System.out) 
@@ -577,7 +581,8 @@ public class Main {
 	private static void read(String address)
 	{
 		int addr = Integer.parseInt(address, 16);
-		cpu.readAddress(addr);
+		byte value = cpu.getMem().getLayout()[addr].read();
+		System.out.println("Value is " + String.format("0x%02X", value));
 	}
 	
 	private static void writep(String remainder)
@@ -593,6 +598,20 @@ public class Main {
 	{
 		int addr = Integer.parseInt(address, 16);
 		ppu.readAddress(addr);
+	}
+	
+	private static void search(String value)
+	{
+		int val = Integer.parseInt(value, 16);
+		byte v = (byte)val;
+		
+		for (int i = 0; i < 0x800; ++i)
+		{
+			if (cpu.getMem().getLayout()[i].read() == v)
+			{
+				System.out.println("Match at " + String.format("0x%04X", i));
+			}
+		}
 	}
 	
 	private static void print()

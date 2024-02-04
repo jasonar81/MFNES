@@ -12,6 +12,7 @@ public class NetGui extends DefaultGUI {
 	private Clock clock;
 	private boolean allButtons;
 	private long[] selectTimes = new long[0];
+	private boolean restrictedStart = false;
 	
 	public NetGui(boolean allButtons, long numControllerRequests, long firstUsableCycle, ControllerNeuralNet cnn, long[] startOnOffTimes, Clock clock)
 	{
@@ -26,6 +27,11 @@ public class NetGui extends DefaultGUI {
 	public void setSelectTimes(long[] selectTimes)
 	{
 		this.selectTimes = selectTimes;
+	}
+	
+	public void setRestrictedStart()
+	{
+		restrictedStart = true;
 	}
 	
 	@Override
@@ -130,7 +136,13 @@ public class NetGui extends DefaultGUI {
 		
 		state = cnn.getButtonState(clock.getPpuExpectedCycle());
 		++requests;
-		return Utils.getBit(state, 0);
+		
+		if (!restrictedStart)
+		{
+			return Utils.getBit(state, 0);
+		}
+		
+		return state == 1;
 	}
 
 	@Override

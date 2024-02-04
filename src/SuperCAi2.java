@@ -276,7 +276,7 @@ public class SuperCAi2 implements AiAgent {
 			this.totalTime = totalTime;
 			++livesLost;
 			score = gameScore();
-			finalScore = (score * 1.0) / livesLost;
+			finalScore = score;
 			
 			if (totalTime == 0)
 			{
@@ -324,11 +324,11 @@ public class SuperCAi2 implements AiAgent {
 		long val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e3].read());
 		retval += val;
 		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e4].read());
-		retval += val * 100;
+		retval += val * 256;
 		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x07e5].read());
-		retval += val * 10000;
+		retval += val * 256 * 256;
 		val = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x50].read());
-		retval += val * 1000000;
+		retval += val * 256 * 256 * 256;
 		
 		return retval;
 	}

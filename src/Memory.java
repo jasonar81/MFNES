@@ -332,28 +332,6 @@ public class Memory {
 		}
 		
 		//layout[0x50] = new MonitorMemoryPort(0x50);
-		//layout[0x51] = new MonitorMemoryPort(0x51);
-		//layout[0x52] = new MonitorMemoryPort(0x52);
-		//layout[0x53] = new MonitorMemoryPort(0x53);
-		//layout[0x54] = new MonitorMemoryPort(0x54);
-		//layout[0x55] = new MonitorMemoryPort(0x55);
-		//layout[0x56] = new MonitorMemoryPort(0x56);
-		//layout[0x57] = new MonitorMemoryPort(0x57);
-		//layout[0x58] = new MonitorMemoryPort(0x58);
-		//layout[0x59] = new MonitorMemoryPort(0x59);
-		//layout[0x5a] = new MonitorMemoryPort(0x5a);
-		//layout[0x5b] = new MonitorMemoryPort(0x5b);
-		//layout[0x5c] = new MonitorMemoryPort(0x5c);
-		//layout[0x5d] = new MonitorMemoryPort(0x5d);
-		//layout[0x5e] = new MonitorMemoryPort(0x5e);
-		//layout[0x5f] = new MonitorMemoryPort(0x5f);
-		
-		/*
-		for (int i = 0x50; i < 0x60; ++i)
-		{
-			layout[i] = new MonitorMemoryPort(i);
-		}
-		*/
 	}
 	
 	private void mapper0()
