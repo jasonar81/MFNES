@@ -331,7 +331,7 @@ public class Memory {
 			}
 		}
 		
-		//layout[0x50] = new MonitorMemoryPort(0x50);
+		//layout[0x69b] = new MonitorMemoryPort(0x69b);
 	}
 	
 	private void mapper0()

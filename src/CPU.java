@@ -37,6 +37,7 @@ public class CPU implements Runnable {
 	private boolean inNmi = false;
 	private GUI gui;
 	private APU apu;
+	private boolean check = false;
 	
 	public static volatile boolean LOG = false;
 	
@@ -80,6 +81,16 @@ public class CPU implements Runnable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public void enableChecking()
+	{
+		check = true;
+	}
+	
+	public Clock getClock()
+	{
+		return clock;
 	}
 	
 	public void setApu(APU apu)
@@ -3179,6 +3190,7 @@ public class CPU implements Runnable {
 		int low, high, addr, arg, newAddr;
 		int plus1 = (pc + 1) & 0xffff;
 		int plus2 = 0;
+		int instructionAddress, effectiveAddress;
 		switch(mode)
 		{
 		case ABSOLUTE:
@@ -3196,9 +3208,16 @@ public class CPU implements Runnable {
 			addr = Utils.makeUnsigned(low, high);
 			low = memRead(addr);
 			high = memRead(addr+1);
+			instructionAddress = pc;
 			pc += 3;
 			pc &= 0xffff;
-			return Utils.makeUnsigned(low, high);
+			effectiveAddress = Utils.makeUnsigned(low, high);
+			if (check)
+			{
+				System.out.println("Indirect jump instruction at address " + String.format("0x%04X", instructionAddress) + " had a target address of " + String.format("0x%04X", effectiveAddress));
+			}
+			
+			return effectiveAddress;
 		case ABSOLUTEX:
 			plus2 = (pc + 2) & 0xffff;
 			low = memRead(plus1); //2nd cycle
@@ -3208,6 +3227,15 @@ public class CPU implements Runnable {
 			readOops(addr, newAddr);
 			pc += 3;
 			pc &= 0xffff;
+			
+			if (newAddr >= 0x0800 && newAddr < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", newAddr));
+				}
+			}
+			
 			return newAddr;
 		case ABSOLUTEY:
 			plus2 = (pc + 2) & 0xffff;
@@ -3218,6 +3246,15 @@ public class CPU implements Runnable {
 			readOops(addr, newAddr);
 			pc += 3;
 			pc &= 0xffff;
+			
+			if (newAddr >= 0x0800 && newAddr < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", newAddr));
+				}
+			}
+			
 			return newAddr;
 		case ABSOLUTEX_WRITE:
 			plus2 = (pc + 2) & 0xffff;
@@ -3228,6 +3265,15 @@ public class CPU implements Runnable {
 			memRead((newAddr & 0xff) + (addr & 0xff00));
 			pc += 3;
 			pc &= 0xffff;
+			
+			if (newAddr >= 0x0800 && newAddr < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", newAddr));
+				}
+			}
+			
 			return newAddr;
 		case ABSOLUTEY_WRITE:
 			plus2 = (pc + 2) & 0xffff;
@@ -3238,6 +3284,15 @@ public class CPU implements Runnable {
 			memRead((newAddr & 0xff) + (addr & 0xff00));
 			pc += 3;
 			pc &= 0xffff;
+			
+			if (newAddr >= 0x0800 && newAddr < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", newAddr));
+				}
+			}
+			
 			return newAddr;
 		case IMMEDIATE:
 			addr = memRead(plus1); //2nd cycle
@@ -3248,17 +3303,45 @@ public class CPU implements Runnable {
 			arg = memRead(plus1);
 			pc += 2;
 			pc &= 0xffff;
-			return indirectXAddress(arg);
+			effectiveAddress = indirectXAddress(arg);
+			if (effectiveAddress >= 0x0800 && effectiveAddress < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", effectiveAddress));
+				}
+			}
+			
+			return effectiveAddress;
 		case INDIRECTY:
 			arg = memRead(plus1);
 			pc += 2;
 			pc &= 0xffff;
-			return indirectYAddress(arg);
+			
+			effectiveAddress = indirectYAddress(arg);
+			if (effectiveAddress >= 0x0800 && effectiveAddress < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", effectiveAddress));
+				}
+			}
+			
+			return effectiveAddress;
 		case INDIRECTY_WRITE:
 			arg = memRead(plus1);
 			pc += 2;
 			pc &= 0xffff;
-			return indirectYAddressWrite(arg);
+			effectiveAddress = indirectYAddressWrite(arg);
+			if (effectiveAddress >= 0x0800 && effectiveAddress < 0x8000)
+			{
+				if (check)
+				{
+					System.out.println("NON-ABSOLUTE R/W THAT NEEDS TRACKING: " + String.format("0x%04X", effectiveAddress));
+				}
+			}
+			
+			return effectiveAddress;
 		case ZEROPAGE:
 			addr = memRead(plus1); //2nd cycle
 			pc += 2;

@@ -1,6 +1,7 @@
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 
@@ -10,12 +11,22 @@ public class Register4016 implements MemoryPort {
 	public int counter = 0;
 	public int counter2 = 0;
 	private CPU cpu;
-	PrintWriter log;
+	private PrintWriter log;
+	private boolean enableTracking = false;
+	private HashSet<Integer> tracking;
+	private long firstUsableCycle;
 	
 	public Register4016(GUI gui, CPU cpu)
 	{
 		this.gui = gui;
 		this.cpu = cpu;
+	}
+	
+	public void enableTracking(long firstUsableCycle)
+	{
+		enableTracking = true;
+		this.firstUsableCycle = firstUsableCycle;
+		tracking = new HashSet<Integer>();
 	}
 	
 	public void enableLogging(String filename)
@@ -167,6 +178,18 @@ public class Register4016 implements MemoryPort {
 			
 			log.println(line.toString());
 		}
+		else if (counter == 0 && enableTracking)
+		{
+			if (cpu.getClock().getPpuExpectedCycle() >= firstUsableCycle)
+			{
+				int[] ram = cpu.getMem().getAllRam();
+				for (int i = 0; i < ram.length; ++i)
+				{
+					int token = (i << 8) + Byte.toUnsignedInt(((byte)ram[i]));
+					tracking.add(token);
+				}
+			}
+		}
 		
 		if (!hold)
 		{
@@ -179,6 +202,11 @@ public class Register4016 implements MemoryPort {
 		}
 		
 		return 0x40;
+	}
+	
+	public HashSet<Integer> getTracking()
+	{
+		return tracking;
 	}
 
 	@Override

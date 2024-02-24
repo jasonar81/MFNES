@@ -136,6 +136,10 @@ public class Main {
 		{
 			search(command.substring(9));
 		}
+		else if (command.equalsIgnoreCase("check"))
+		{
+			check();
+		}
 		else
 		{
 			synchronized(System.out) 
@@ -143,6 +147,11 @@ public class Main {
 				System.out.println("Unknown command");
 			}
 		}
+	}
+	
+	private static void check()
+	{
+		cpu.enableChecking();
 	}
 	
 	private static void genie(String code)
