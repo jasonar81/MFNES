@@ -25,6 +25,15 @@ public class NewMutatingDecisionTree implements Serializable {
 		root.myNum = 0;
 	}
 	
+	public void resetRoot()
+	{
+		root = new IfElseNode();
+		root.terminal = true;
+		root.terminalValue = 0;
+		treeSize = 1;
+		root.myNum = 0;
+	}
+	
 	public void setValidStates(ArrayList<Integer> validStates)
 	{
 		this.validStates = validStates;
@@ -923,11 +932,22 @@ public class NewMutatingDecisionTree implements Serializable {
 		return intersection;
 	}
 	
-	public NewMutatingDecisionTree merge(NewMutatingDecisionTree rhs, HashSet<Integer> addressesAndValues1, HashSet<Integer> addressesAndValues2)
+	public IfElseNode merge(NewMutatingDecisionTree rhs, HashSet<Integer> addressesAndValues1, HashSet<Integer> addressesAndValues2)
 	{
 		HashSet<Integer> addressesAndValues = intersect(addressesAndValues1, addressesAndValues2);
-		IfElseNode left = root.clone();
-		IfElseNode right = rhs.root.clone();
+		IfElseNode left;
+		IfElseNode right;
+		
+		if (ThreadLocalRandom.current().nextBoolean())
+		{
+			left = root.clone();
+			right = rhs.root.clone();
+		}
+		else
+		{
+			left = rhs.root.clone();
+			right = root.clone();
+		}
 		
 		IfElseNode newNode = new IfElseNode();
 		newNode.right = right;
@@ -966,15 +986,17 @@ public class NewMutatingDecisionTree implements Serializable {
 					newNode.address2 = 0;
 				}
 				
-				NewMutatingDecisionTree newTree = new NewMutatingDecisionTree(validStates);
-				newTree.root = newNode;
-				newTree.reindexTree();
-				return newTree;
+				return newNode;
 			}
 			
 			++i;
 		}
 		
 		return null;
+	}
+	
+	public void setRoot(IfElseNode root)
+	{
+		this.root = root;
 	}
 }

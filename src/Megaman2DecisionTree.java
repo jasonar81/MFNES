@@ -25,6 +25,7 @@ public class Megaman2DecisionTree implements AiAgent {
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
+	private volatile long highScore2 = 0;
 	private volatile boolean done;
 	private volatile boolean startedDone;
 	private volatile long score;
@@ -35,6 +36,11 @@ public class Megaman2DecisionTree implements AiAgent {
 	private NewMutatingDecisionTree tree;
 	private DecisionTreeController controller;
 	private long numControllerRequests = 5000;
+	private NewMutatingDecisionTree tree2;
+	private DecisionTreeController controller2;
+	private long numControllerRequests2 = 5000;
+	private NewMutatingDecisionTree tree3;
+	private DecisionTreeController controller3;
 	
 	private int previousLives = 0;
 	private int previousBossHp = 0;
@@ -106,7 +112,7 @@ public class Megaman2DecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 2;
+			numControllerRequests *= 3;
 			setup();
 			load("megaman2.nes", "sav");
 			makeModifications();
@@ -121,7 +127,7 @@ public class Megaman2DecisionTree implements AiAgent {
 			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
 			
 			teardown();
-			if (score > highScore)
+			if (score > highScore && confirm(1))
 			{
 				highScore = score;
 				System.out.println("New high score!");
@@ -132,6 +138,73 @@ public class Megaman2DecisionTree implements AiAgent {
 				break;
 			}
 		}
+		
+		if (!loadTree2())
+		{
+			tree2 = new NewMutatingDecisionTree(validStates);
+			controller2 = new DecisionTreeController(tree2.getRoot());
+		}
+		
+		tree2.setValidStates(validStates);
+		setup2();
+		load("megaman2.nes", "sav");
+		makeModifications();
+		controller2.reset();
+		controller2.setCpuMem(cpuMem);
+		controller2.setTree(tree2.getRoot());
+		run();
+		
+		while (!done) {}
+		
+		System.out.println("Score of " + score);
+
+		highScore2 = score;
+		if (highScore2 > highScore)
+		{
+			System.out.println("New high score!");
+		}
+		
+		HashSet<Integer> addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+		HashSet<Integer> previous2;
+		teardown();
+		
+		while (true)
+		{
+			numControllerRequests2 *= 3;
+			setup2();
+			load("megaman2.nes", "sav");
+			makeModifications();
+			controller2.reset();
+			controller2.setCpuMem(cpuMem);
+			controller2.setTree(tree2.getRoot());
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+			
+			addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+	
+			teardown();
+			if (score > highScore2 && confirm(2))
+			{
+				highScore2 = score;
+				
+				if (score > highScore)
+				{
+					System.out.println("New high score!");
+				}
+				
+				saveTree2();
+			}
+			else
+			{
+				break;
+			}
+		}
+		
+		tree3 = new NewMutatingDecisionTree(validStates);
+		controller3 = new DecisionTreeController(tree2.getRoot());
 		
 		while (true)
 		{
@@ -152,14 +225,14 @@ public class Megaman2DecisionTree implements AiAgent {
 			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
 	
 			teardown();
-			if (score > highScore)
+			if (score > highScore && confirm(1))
 			{
 				highScore = score;
 				System.out.println("New high score!");
 				saveTree();
 				if (numControllerRequests < 300000000)
 				{
-					numControllerRequests *= 2;
+					numControllerRequests *= 3;
 				}
 				
 				tree.persist();
@@ -175,7 +248,205 @@ public class Megaman2DecisionTree implements AiAgent {
 				saveTree();
 				addressesAndValues = previous;
 			}
+			
+			tree2.mutate(addressesAndValues2);
+			previous2 = addressesAndValues2;
+			setup2();
+			load("megaman2.nes", "sav");
+			makeModifications();
+			controller2.reset();
+			controller2.setCpuMem(cpuMem);
+			controller2.setTree(tree2.getRoot());
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+			
+			previous2 = addressesAndValues2;
+			addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+	
+			teardown();
+			if (score > highScore2 && confirm(2))
+			{
+				if (score > highScore)
+				{
+					System.out.println("New high score!");
+					highScore2 = highScore;
+					highScore = score;
+					HashSet<Integer> aav = addressesAndValues;
+					addressesAndValues = addressesAndValues2;
+					addressesAndValues2 = aav;
+					tree3.setRoot(tree2.getRoot().clone());
+					tree2.setRoot(tree.getRoot().clone());
+					tree.setRoot(tree3.getRoot().clone());
+					tree3.resetRoot();
+					tree.reindexTree();
+					tree2.reindexTree();
+					saveTree();
+					saveTree2();
+					long temp = numControllerRequests;
+					numControllerRequests = numControllerRequests2;
+					numControllerRequests2 = temp;
+					if (numControllerRequests < 300000000)
+					{
+						numControllerRequests *= 3;
+					}
+				}
+				else
+				{
+					highScore2 = score;
+					saveTree2();
+					if (numControllerRequests2 < 300000000)
+					{
+						numControllerRequests2 *= 3;
+					}
+				
+					tree2.persist();
+				}
+			}
+			else if (score == highScore2)
+			{
+				if (score > highScore)
+				{
+					highScore2 = highScore;
+					highScore = score;
+					HashSet<Integer> aav = addressesAndValues;
+					addressesAndValues = addressesAndValues2;
+					addressesAndValues2 = aav;
+					tree3.setRoot(tree2.getRoot().clone());
+					tree2.setRoot(tree.getRoot().clone());
+					tree.setRoot(tree3.getRoot().clone());
+					tree3.resetRoot();
+					tree.reindexTree();
+					tree2.reindexTree();
+					saveTree();
+					saveTree2();
+					long temp = numControllerRequests;
+					numControllerRequests = numControllerRequests2;
+					numControllerRequests2 = temp;
+					if (numControllerRequests < 300000000)
+					{
+						numControllerRequests *= 3;
+					}
+				}
+				else
+				{
+					saveTree2();
+					tree2.persist();
+				}
+			}
+			else
+			{
+				tree2.revert();
+				saveTree2();
+				addressesAndValues2 = previous2;
+			}
+			
+			tree3.setRoot(tree.merge(tree2, addressesAndValues, addressesAndValues2));
+			tree3.reindexTree();
+			setup3();
+			load("megaman2.nes", "sav");
+			makeModifications();
+			controller3.reset();
+			controller3.setCpuMem(cpuMem);
+			controller3.setTree(tree3.getRoot());
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+	
+			HashSet<Integer> addressesAndValues3 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+			teardown();
+			if (score > highScore2 && score > highScore && confirm(3))
+			{
+				highScore = score;
+				highScore2 = -1;
+				addressesAndValues = addressesAndValues3;
+				System.out.println("New high score!");
+				tree.setRoot(tree3.getRoot().clone());
+				tree2.resetRoot();
+				tree3.resetRoot();
+				tree.reindexTree();
+				tree2.reindexTree();
+				saveTree();
+				saveTree2();
+				if (numControllerRequests < 300000000)
+				{
+					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
+				}
+			}
 		}
+	}
+	
+	private boolean confirm(int num)
+	{
+		int NUM_CONFIRMS = 1;
+		for (int i = 0; i < NUM_CONFIRMS; ++i)
+		{
+			if (num == 1)
+			{
+				setup();
+				load("megaman2.nes", "sav");
+				makeModifications();
+				controller.reset();
+				controller.setCpuMem(cpuMem);
+				controller.setTree(tree.getRoot());
+				run();
+				
+				while (!done) {}
+				
+				System.out.println("Score of " + score);
+		
+				teardown();
+				if (!(score > highScore))
+				{
+					return false;
+				}
+			} else if (num == 2)
+			{
+				setup2();
+				load("megaman2.nes", "sav");
+				makeModifications();
+				controller2.reset();
+				controller2.setCpuMem(cpuMem);
+				controller2.setTree(tree2.getRoot());
+				run();
+				
+				while (!done) {}
+				
+				System.out.println("Score of " + score);
+		
+				teardown();
+				if (!(score > highScore2))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				setup3();
+				load("megaman2.nes", "sav");
+				makeModifications();
+				controller3.reset();
+				controller3.setCpuMem(cpuMem);
+				controller3.setTree(tree3.getRoot());
+				run();
+				
+				while (!done) {}
+				
+				System.out.println("Score of " + score);
+		
+				teardown();
+				if (!(score > highScore && score > highScore2))
+				{
+					return false;
+				}
+			}
+		}
+		
+		return true;
 	}
 	
 	private boolean loadTree()
@@ -225,6 +496,53 @@ public class Megaman2DecisionTree implements AiAgent {
 		return true;
 	}
 	
+	private boolean loadTree2()
+	{
+		try
+		{
+			File file = new File("megaman2.tree2");
+			if (!file.exists())
+			{
+				return false;
+			}
+			
+			FileInputStream f = new FileInputStream(file);
+			ObjectInputStream i = new ObjectInputStream(f);
+	
+			tree2 = (NewMutatingDecisionTree)i.readObject();
+			controller2 = new DecisionTreeController(tree2.getRoot());
+	
+			i.close();
+			f.close();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		return true;
+	}
+	
+	private boolean saveTree2()
+	{
+		try
+		{
+			File file = new File("megaman2.tree2");
+			FileOutputStream f = new FileOutputStream(file);
+			ObjectOutputStream o = new ObjectOutputStream(f);
+	
+			o.writeObject(tree2);
+			o.close();
+			f.close();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		return true;
+	}
+	
 	private void setup()
 	{
 		previousLives = 0;
@@ -237,6 +555,68 @@ public class Megaman2DecisionTree implements AiAgent {
 		
 		long[] startOnOffTimes = new long[] {10890547, 11309846, 14062612, 14921603, 29152813, 30020223, 40020223, 41020223};
 		gui = new DecisionTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
+		long[] rightTimes = new long[] {37020223, 38020223};
+		((DecisionTreeGui)gui).setRightTimes(rightTimes);
+		guiThread = new Thread(gui);
+		guiThread.setPriority(10);
+		guiThread.start();
+		
+		ppuMem = new Memory(Memory.PPU, null, gui);
+		ppu = new PPU(clock, ppuMem, gui);
+		cpuMem = new Memory(Memory.CPU, ppu, gui);
+		cpu = new CPU(clock, cpuMem, ppu, gui);
+		apu = new APU(cpu, gui, clock);
+		cpu.setApu(apu);
+		ppu.setCPU(cpu);
+		cpuMem.setCpu(cpu);
+		ppuMem.setCpu(cpu);
+		gui.setCpu(cpu);
+		gui.setClock(clock);
+	}
+	
+	private void setup2()
+	{
+		previousLives = 0;
+		previousBossHp = 0;
+		score = 0;
+		done = false;
+		startedDone = false;
+		
+		clock = new Clock();
+		
+		long[] startOnOffTimes = new long[] {10890547, 11309846, 14062612, 14921603, 29152813, 30020223, 40020223, 41020223};
+		gui = new DecisionTreeGui(numControllerRequests2, firstUsableCycle, controller2, startOnOffTimes, clock);
+		long[] rightTimes = new long[] {37020223, 38020223};
+		((DecisionTreeGui)gui).setRightTimes(rightTimes);
+		guiThread = new Thread(gui);
+		guiThread.setPriority(10);
+		guiThread.start();
+		
+		ppuMem = new Memory(Memory.PPU, null, gui);
+		ppu = new PPU(clock, ppuMem, gui);
+		cpuMem = new Memory(Memory.CPU, ppu, gui);
+		cpu = new CPU(clock, cpuMem, ppu, gui);
+		apu = new APU(cpu, gui, clock);
+		cpu.setApu(apu);
+		ppu.setCPU(cpu);
+		cpuMem.setCpu(cpu);
+		ppuMem.setCpu(cpu);
+		gui.setCpu(cpu);
+		gui.setClock(clock);
+	}
+	
+	private void setup3()
+	{
+		previousLives = 0;
+		previousBossHp = 0;
+		score = 0;
+		done = false;
+		startedDone = false;
+		
+		clock = new Clock();
+		
+		long[] startOnOffTimes = new long[] {10890547, 11309846, 14062612, 14921603, 29152813, 30020223, 40020223, 41020223};
+		gui = new DecisionTreeGui(Math.max(numControllerRequests, numControllerRequests2), firstUsableCycle, controller3, startOnOffTimes, clock);
 		long[] rightTimes = new long[] {37020223, 38020223};
 		((DecisionTreeGui)gui).setRightTimes(rightTimes);
 		guiThread = new Thread(gui);

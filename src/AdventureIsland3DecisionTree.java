@@ -25,6 +25,7 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 	private GUI gui;
 	private Thread guiThread;
 	private volatile double highScore = 0;
+	private volatile double highScore2 = 0;
 	private volatile double finalScore;
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
@@ -37,6 +38,11 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 	private NewMutatingDecisionTree tree;
 	private DecisionTreeController controller;
 	private long numControllerRequests = 5000;
+	private NewMutatingDecisionTree tree2;
+	private DecisionTreeController controller2;
+	private long numControllerRequests2 = 5000;
+	private NewMutatingDecisionTree tree3;
+	private DecisionTreeController controller3;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -106,7 +112,7 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 2;
+			numControllerRequests *= 3;
 			setup();
 			load("adventure_island3.nes", "sav");
 			makeModifications();
@@ -123,7 +129,7 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
 	
 			teardown();
-			if (finalScore > highScore)
+			if (finalScore > highScore && confirm(1))
 			{
 				highScore = finalScore;
 				System.out.println("New high score!");
@@ -134,6 +140,75 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 				break;
 			}
 		}
+		
+		if (!loadTree2())
+		{
+			tree2 = new NewMutatingDecisionTree(validStates);
+			controller2 = new DecisionTreeController(tree2.getRoot());
+		}
+		
+		tree2.setValidStates(validStates);
+		setup2();
+		load("adventure_island3.nes", "sav");
+		makeModifications();
+		controller2.reset();
+		controller2.setCpuMem(cpuMem);
+		controller2.setTree(tree2.getRoot());
+		run();
+		
+		while (!done) {}
+		
+		printResults();
+		System.out.println("Score of " + finalScore);
+
+		highScore2 = finalScore;
+		if (highScore2 > highScore)
+		{
+			System.out.println("New high score!");
+		}
+		
+		HashSet<Integer> addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+		HashSet<Integer> previous2;
+		teardown();
+		
+		while (true)
+		{
+			numControllerRequests2 *= 3;
+			setup2();
+			load("adventure_island3.nes", "sav");
+			makeModifications();
+			controller2.reset();
+			controller2.setCpuMem(cpuMem);
+			controller2.setTree(tree2.getRoot());
+			run();
+			
+			while (!done) {}
+			
+			printResults();
+			System.out.println("Score of " + finalScore);
+			
+			addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+	
+			teardown();
+			if (finalScore > highScore2 && confirm(2))
+			{
+				highScore2 = finalScore;
+				
+				if (finalScore > highScore)
+				{
+					System.out.println("New high score!");
+				}
+				
+				saveTree2();
+			}
+			else
+			{
+				break;
+			}
+		}
+		
+		tree3 = new NewMutatingDecisionTree(validStates);
+		controller3 = new DecisionTreeController(tree2.getRoot());
 		
 		while (true)
 		{
@@ -156,14 +231,14 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
 	
 			teardown();
-			if (finalScore > highScore)
+			if (finalScore > highScore && confirm(1))
 			{
 				highScore = finalScore;
 				System.out.println("New high score!");
 				saveTree();
 				if (numControllerRequests < 300000000)
 				{
-					numControllerRequests *= 2;
+					numControllerRequests *= 3;
 				}
 				
 				tree.persist();
@@ -179,7 +254,210 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 				saveTree();
 				addressesAndValues = previous;
 			}
+			
+			tree2.mutate(addressesAndValues2);
+			previous2 = addressesAndValues2;
+			setup2();
+			load("adventure_island3.nes", "sav");
+			makeModifications();
+			controller2.reset();
+			controller2.setCpuMem(cpuMem);
+			controller2.setTree(tree2.getRoot());
+			run();
+			
+			while (!done) {}
+			
+			printResults();
+			System.out.println("Score of " + finalScore);
+			
+			previous2 = addressesAndValues2;
+			addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+	
+			teardown();
+			if (finalScore > highScore2 && confirm(2))
+			{
+				if (finalScore > highScore)
+				{
+					System.out.println("New high score!");
+					highScore2 = highScore;
+					highScore = finalScore;
+					HashSet<Integer> aav = addressesAndValues;
+					addressesAndValues = addressesAndValues2;
+					addressesAndValues2 = aav;
+					tree3.setRoot(tree2.getRoot().clone());
+					tree2.setRoot(tree.getRoot().clone());
+					tree.setRoot(tree3.getRoot().clone());
+					tree3.resetRoot();
+					tree.reindexTree();
+					tree2.reindexTree();
+					saveTree();
+					saveTree2();
+					long temp = numControllerRequests;
+					numControllerRequests = numControllerRequests2;
+					numControllerRequests2 = temp;
+					if (numControllerRequests < 300000000)
+					{
+						numControllerRequests *= 3;
+					}
+				}
+				else
+				{
+					highScore2 = finalScore;
+					saveTree2();
+					if (numControllerRequests2 < 300000000)
+					{
+						numControllerRequests2 *= 3;
+					}
+				
+					tree2.persist();
+				}
+			}
+			else if (finalScore == highScore2)
+			{
+				if (finalScore > highScore)
+				{
+					highScore2 = highScore;
+					highScore = finalScore;
+					HashSet<Integer> aav = addressesAndValues;
+					addressesAndValues = addressesAndValues2;
+					addressesAndValues2 = aav;
+					tree3.setRoot(tree2.getRoot().clone());
+					tree2.setRoot(tree.getRoot().clone());
+					tree.setRoot(tree3.getRoot().clone());
+					tree3.resetRoot();
+					tree.reindexTree();
+					tree2.reindexTree();
+					saveTree();
+					saveTree2();
+					long temp = numControllerRequests;
+					numControllerRequests = numControllerRequests2;
+					numControllerRequests2 = temp;
+					if (numControllerRequests < 300000000)
+					{
+						numControllerRequests *= 3;
+					}
+				}
+				else
+				{
+					saveTree2();
+					tree2.persist();
+				}
+			}
+			else
+			{
+				tree2.revert();
+				saveTree2();
+				addressesAndValues2 = previous2;
+			}
+			
+			tree3.setRoot(tree.merge(tree2, addressesAndValues, addressesAndValues2));
+			tree3.reindexTree();
+			setup3();
+			load("adventure_island3.nes", "sav");
+			makeModifications();
+			controller3.reset();
+			controller3.setCpuMem(cpuMem);
+			controller3.setTree(tree3.getRoot());
+			run();
+			
+			while (!done) {}
+			
+			printResults();
+			System.out.println("Score of " + finalScore);
+	
+			HashSet<Integer> addressesAndValues3 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+			teardown();
+			if (finalScore > highScore2 && finalScore > highScore && confirm(3))
+			{
+				highScore = finalScore;
+				highScore2 = -1;
+				addressesAndValues = addressesAndValues3;
+				System.out.println("New high score!");
+				tree.setRoot(tree3.getRoot().clone());
+				tree2.resetRoot();
+				tree3.resetRoot();
+				tree.reindexTree();
+				tree2.reindexTree();
+				saveTree();
+				saveTree2();
+				if (numControllerRequests < 300000000)
+				{
+					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
+				}
+			}
 		}
+	}
+	
+	private boolean confirm(int num)
+	{
+		int NUM_CONFIRMS = 1;
+		for (int i = 0; i < NUM_CONFIRMS; ++i)
+		{
+			if (num == 1)
+			{
+				setup();
+				load("adventure_island3.nes", "sav");
+				makeModifications();
+				controller.reset();
+				controller.setCpuMem(cpuMem);
+				controller.setTree(tree.getRoot());
+				run();
+				
+				while (!done) {}
+				
+				printResults();
+				System.out.println("Score of " + finalScore);
+		
+				teardown();
+				if (!(finalScore > highScore))
+				{
+					return false;
+				}
+			} else if (num == 2)
+			{
+				setup2();
+				load("adventure_island3.nes", "sav");
+				makeModifications();
+				controller2.reset();
+				controller2.setCpuMem(cpuMem);
+				controller2.setTree(tree2.getRoot());
+				run();
+				
+				while (!done) {}
+				
+				printResults();
+				System.out.println("Score of " + finalScore);
+		
+				teardown();
+				if (!(finalScore > highScore2))
+				{
+					return false;
+				}
+			}
+			else
+			{
+				setup3();
+				load("adventure_island3.nes", "sav");
+				makeModifications();
+				controller3.reset();
+				controller3.setCpuMem(cpuMem);
+				controller3.setTree(tree3.getRoot());
+				run();
+				
+				while (!done) {}
+				
+				printResults();
+				System.out.println("Score of " + finalScore);
+		
+				teardown();
+				if (!(finalScore > highScore && finalScore > highScore2))
+				{
+					return false;
+				}
+			}
+		}
+		
+		return true;
 	}
 	
 	private boolean loadTree()
@@ -229,6 +507,53 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 		return true;
 	}
 	
+	private boolean loadTree2()
+	{
+		try
+		{
+			File file = new File("adventure_island3.tree2");
+			if (!file.exists())
+			{
+				return false;
+			}
+			
+			FileInputStream f = new FileInputStream(file);
+			ObjectInputStream i = new ObjectInputStream(f);
+	
+			tree2 = (NewMutatingDecisionTree)i.readObject();
+			controller2 = new DecisionTreeController(tree2.getRoot());
+	
+			i.close();
+			f.close();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		return true;
+	}
+	
+	private boolean saveTree2()
+	{
+		try
+		{
+			File file = new File("adventure_island3.tree2");
+			FileOutputStream f = new FileOutputStream(file);
+			ObjectOutputStream o = new ObjectOutputStream(f);
+	
+			o.writeObject(tree2);
+			o.close();
+			f.close();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		return true;
+	}
+	
 	private void setup()
 	{
 		livesLost = 0;
@@ -240,6 +565,62 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 				32753013, 41099303, 42326987};
 		clock = new Clock();
 		gui = new DecisionTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
+		guiThread = new Thread(gui);
+		guiThread.setPriority(10);
+		guiThread.start();
+		
+		ppuMem = new Memory(Memory.PPU, null, gui);
+		ppu = new PPU(clock, ppuMem, gui);
+		cpuMem = new Memory(Memory.CPU, ppu, gui);
+		cpu = new CPU(clock, cpuMem, ppu, gui);
+		apu = new APU(cpu, gui, clock);
+		cpu.setApu(apu);
+		ppu.setCPU(cpu);
+		cpuMem.setCpu(cpu);
+		ppuMem.setCpu(cpu);
+		gui.setCpu(cpu);
+		gui.setClock(clock);
+	}
+	
+	private void setup2()
+	{
+		livesLost = 0;
+		score = 0;
+		done = false;
+		startedDone = false;
+		
+		long[] startOnOffTimes = new long[] {14926749, 15876563, 21252721, 22065701, 31540991,
+				32753013, 41099303, 42326987};
+		clock = new Clock();
+		gui = new DecisionTreeGui(numControllerRequests2, firstUsableCycle, controller2, startOnOffTimes, clock);
+		guiThread = new Thread(gui);
+		guiThread.setPriority(10);
+		guiThread.start();
+		
+		ppuMem = new Memory(Memory.PPU, null, gui);
+		ppu = new PPU(clock, ppuMem, gui);
+		cpuMem = new Memory(Memory.CPU, ppu, gui);
+		cpu = new CPU(clock, cpuMem, ppu, gui);
+		apu = new APU(cpu, gui, clock);
+		cpu.setApu(apu);
+		ppu.setCPU(cpu);
+		cpuMem.setCpu(cpu);
+		ppuMem.setCpu(cpu);
+		gui.setCpu(cpu);
+		gui.setClock(clock);
+	}
+	
+	private void setup3()
+	{
+		livesLost = 0;
+		score = 0;
+		done = false;
+		startedDone = false;
+		
+		long[] startOnOffTimes = new long[] {14926749, 15876563, 21252721, 22065701, 31540991,
+				32753013, 41099303, 42326987};
+		clock = new Clock();
+		gui = new DecisionTreeGui(Math.max(numControllerRequests, numControllerRequests2), firstUsableCycle, controller3, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();

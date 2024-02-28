@@ -716,43 +716,21 @@ public class PPU implements Runnable {
 		if (activeSprite != 0x00000000ffffffffL)
 		{
 			int xMin = (int)(activeSprite & 0xff);
-			int xMax = (xMin + 7) & 0xff;
-			
-			if (xMin < xMax)
+			int xMax = (xMin + 7);
+			if (xMax > 255)
 			{
-				int spriteAddress = getSpriteAddress(activeSprite, xMin, y);
-				int spriteByte1 = mem.read(spriteAddress);
-				int spriteByte2 = mem.read(spriteAddress + 8);
-				for (int i = xMin; i <= xMax; ++i)
-				{
-					int temp = getSpriteColor(activeSprite, i, y, spriteByte1, spriteByte2);
-					if (spriteColors[i] == -1)
-					{
-						spriteColors[i] = temp;
-					}
-				}
+				xMax = 255;
 			}
-			else
+			
+			int spriteAddress = getSpriteAddress(activeSprite, xMin, y);
+			int spriteByte1 = mem.read(spriteAddress);
+			int spriteByte2 = mem.read(spriteAddress + 8);
+			for (int i = xMin; i <= xMax; ++i)
 			{
-				int spriteAddress = getSpriteAddress(activeSprite, xMin, y);
-				int spriteByte1 = mem.read(spriteAddress);
-				int spriteByte2 = mem.read(spriteAddress + 8);
-				for (int i = xMin; i < 256; ++i)
+				int temp = getSpriteColor(activeSprite, i, y, spriteByte1, spriteByte2);
+				if (spriteColors[i] == -1)
 				{
-					int temp = getSpriteColor(activeSprite, i, y, spriteByte1, spriteByte2);
-					if (spriteColors[i] == -1)
-					{
-						spriteColors[i] = temp;
-					}
-				}
-				
-				for (int i = 0; i <= xMax; ++i)
-				{
-					int temp = getSpriteColor(activeSprite, i, y, spriteByte1, spriteByte2);
-					if (spriteColors[i] == -1)
-					{
-						spriteColors[i] = temp;
-					}
+					spriteColors[i] = temp;
 				}
 			}
 		}
@@ -900,9 +878,13 @@ public class PPU implements Runnable {
 			if (b0 != 0xff || b1 != 0xff || b2 != 0xff || b3 != 0xff)
 			{
 				int xMin = b3;
-				int xMax = (xMin + 7) & 0xff;
+				int xMax = (xMin + 7);
+				if (xMax > 255)
+				{
+					xMax = 255;
+				}
 				
-				if ((x >= xMin && x <= xMax) || (xMax < xMin && (x >= xMin || x <= xMax)))
+				if (x >= xMin && x <= xMax)
 				{
 					return (((long)b0) << 24) + (((long)b1) << 16) + (((long)b2) << 8) + (long)b3;
 				}

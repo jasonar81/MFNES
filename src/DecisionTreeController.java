@@ -10,7 +10,10 @@ public class DecisionTreeController {
 	private int currentState;
 	
 	public void reset()
-	{}
+	{
+		counter = 0;
+		currentState = 0;
+	}
 	
 	public DecisionTreeController(IfElseNode tree)
 	{	
