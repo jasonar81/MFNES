@@ -30,8 +30,6 @@ public class SuperCDecisionTree implements AiAgent {
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
 	private volatile long score;
-	private volatile long livesLost;
-	private volatile long totalTime;
 	
 	private static SuperCDecisionTree instance;
 	
@@ -44,6 +42,8 @@ public class SuperCDecisionTree implements AiAgent {
 	private long numControllerRequests2 = 5000;
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
+	
+	private long usedControllerRequests;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -130,7 +130,7 @@ public class SuperCDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("super_c.nes", "sav");
 			makeModifications();
@@ -190,7 +190,7 @@ public class SuperCDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("super_c.nes", "sav");
 			makeModifications();
@@ -252,10 +252,7 @@ public class SuperCDecisionTree implements AiAgent {
 				highScore = finalScore;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -308,21 +305,14 @@ public class SuperCDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = finalScore;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = usedControllerRequests * 3;
 				
 					tree2.persist();
 				}
@@ -345,12 +335,8 @@ public class SuperCDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -394,10 +380,8 @@ public class SuperCDecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 5000;
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -567,9 +551,7 @@ public class SuperCDecisionTree implements AiAgent {
 	
 	private void setup()
 	{
-		livesLost = 0;
 		score = 0;
-		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
@@ -596,9 +578,7 @@ public class SuperCDecisionTree implements AiAgent {
 	
 	private void setup2()
 	{
-		livesLost = 0;
 		score = 0;
-		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
@@ -625,9 +605,7 @@ public class SuperCDecisionTree implements AiAgent {
 	
 	private void setup3()
 	{
-		livesLost = 0;
 		score = 0;
-		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
@@ -708,7 +686,7 @@ public class SuperCDecisionTree implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x53] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x59] = new NotifyChangesPort(this, clock); //Continues
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -719,8 +697,6 @@ public class SuperCDecisionTree implements AiAgent {
 			pause();
 			System.out.println("Done");
 			startedDone = true;
-			this.totalTime = totalTime;
-			++livesLost;
 			score = gameScore();
 			finalScore = score;
 			
@@ -730,6 +706,7 @@ public class SuperCDecisionTree implements AiAgent {
 			}
 			
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -751,14 +728,11 @@ public class SuperCDecisionTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x53].read() == 0)
+			if (cpu.getMem().getLayout()[0x59].read() == 1)
 			{
 				setDone(0);
 				return;
 			}
-			
-			++livesLost;
-			System.out.println("Died");
 		}
 		
 		cont();

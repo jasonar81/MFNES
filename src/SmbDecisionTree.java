@@ -29,6 +29,8 @@ public class SmbDecisionTree implements AiAgent {
 	private volatile boolean done;
 	private volatile boolean startedDone;
 	private volatile long score;
+	private volatile long previousScreen = 0;
+	private volatile long previousLevel = 0;
 	
 	private static SmbDecisionTree instance;
 	
@@ -46,6 +48,8 @@ public class SmbDecisionTree implements AiAgent {
 	private long numControllerRequests2 = 5000;
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
+	
+	private long usedControllerRequests;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -116,7 +120,7 @@ public class SmbDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("smb.nes");
 			makeModifications();
@@ -178,7 +182,7 @@ public class SmbDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("smb.nes");
 			makeModifications();
@@ -241,10 +245,7 @@ public class SmbDecisionTree implements AiAgent {
 				highScore = score;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -297,21 +298,14 @@ public class SmbDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = score;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = usedControllerRequests * 3;
 				
 					tree2.persist();
 				}
@@ -334,12 +328,8 @@ public class SmbDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -383,10 +373,8 @@ public class SmbDecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 5000;
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -556,6 +544,8 @@ public class SmbDecisionTree implements AiAgent {
 	
 	private void setup()
 	{
+		previousScreen = 0;
+		previousLevel = 0;
 		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousTimer = 999;
@@ -585,6 +575,8 @@ public class SmbDecisionTree implements AiAgent {
 	
 	private void setup2()
 	{
+		previousScreen = 0;
+		previousLevel = 0;
 		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousTimer = 999;
@@ -614,6 +606,8 @@ public class SmbDecisionTree implements AiAgent {
 	
 	private void setup3()
 	{
+		previousScreen = 0;
+		previousLevel = 0;
 		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousTimer = 999;
@@ -721,9 +715,8 @@ public class SmbDecisionTree implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x0e] = new DoneRamPort((byte)6, this, clock); //Call it a wrap when there's a death
-		cpu.getMem().getLayout()[0x7fc] = new NonZeroDoneRamPort(this, clock); //I think this increments with game completions
 		cpu.getMem().getLayout()[0x71a] = new NotifyChangesPort(this, clock); //call progress when we get to a new screen
+		cpu.getMem().getLayout()[0x75a] = new NotifyChangesPort(this, clock); //when continues decrement 
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -742,6 +735,7 @@ public class SmbDecisionTree implements AiAgent {
 			System.out.println("Screen scores size is " + screenScores.size());
 			System.out.println("Added " + partialScore + " to score");
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -772,12 +766,28 @@ public class SmbDecisionTree implements AiAgent {
 	public synchronized void progress(long cycle)
 	{
 		pause();
-		long screenScore = finishedScreenScore(cycle);
-		score += screenScore;
-		screenScores.add(screenScore);
-		screenScores = screenScores;
-		System.out.println("Screen scores size is " + screenScores.size());
-		System.out.println("Added " + screenScore + " to score");
+		long screen = getScreenInLevel();
+		long level = getLevel();
+		
+		if (screen > previousScreen || level > previousLevel)
+		{
+			previousScreen = screen;
+			previousLevel = level;
+			
+			long screenScore = finishedScreenScore(cycle);
+			score += screenScore;
+			screenScores.add(screenScore);
+			screenScores = screenScores;
+			System.out.println("Screen scores size is " + screenScores.size());
+			System.out.println("Added " + screenScore + " to score");
+		}
+		
+		if (cpu.getMem().getLayout()[0x75a].read() == (byte)0xff)
+		{
+			setDone(cycle);
+			return;
+		}
+		
 		cont();
 	}
 	

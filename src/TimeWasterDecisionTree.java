@@ -12,7 +12,7 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-public class DoubleDragon2DecisionTree implements AiAgent {
+public class TimeWasterDecisionTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -30,17 +30,17 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
 	private volatile long score;
-	private volatile long livesLost;
+	private volatile long blocks;
 	
-	private static DoubleDragon2DecisionTree instance;
+	private static TimeWasterDecisionTree instance;
 	
-	private long firstUsableCycle = 54682507;
+	private long firstUsableCycle = 7140532;
 	private NewMutatingDecisionTree tree;
 	private DecisionTreeController controller;
-	private long numControllerRequests = 1000;
+	private long numControllerRequests = 5000;
 	private NewMutatingDecisionTree tree2;
 	private DecisionTreeController controller2;
-	private long numControllerRequests2 = 1000;
+	private long numControllerRequests2 = 5000;
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
 	
@@ -57,7 +57,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	
 	public static void main(String[] args)
 	{
-		instance = new DoubleDragon2DecisionTree();
+		instance = new TimeWasterDecisionTree();
 		instance.main();
 	}
 	
@@ -65,25 +65,10 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	{
 		ArrayList<Integer> validStates = new ArrayList<Integer>();
 		validStates.add(0);
-		validStates.add(UP);
-		validStates.add(DOWN);
 		validStates.add(LEFT);
 		validStates.add(RIGHT);
-		validStates.add(UP | A);
-		validStates.add(DOWN | A);
-		validStates.add(LEFT | A);
-		validStates.add(RIGHT | A);
-		validStates.add(UP | B);
-		validStates.add(DOWN | B);
-		validStates.add(LEFT | B);
-		validStates.add(RIGHT | B);
-		validStates.add(UP | A | B);
-		validStates.add(DOWN | A | B);
-		validStates.add(LEFT | A | B);
-		validStates.add(RIGHT | A | B);
-		validStates.add(A);
-		validStates.add(B);
-		validStates.add(A | B);
+		validStates.add(UP);
+		validStates.add(DOWN);
 		
 		if (!loadTree())
 		{	
@@ -93,7 +78,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		
 		tree.setValidStates(validStates);
 		setup();
-		load("double_dragon2.nes", "sav");
+		load("time_waster.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -102,7 +87,6 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		
 		while (!done) {}
 		
-		printResults();
 		System.out.println("Score of " + finalScore);
 
 		highScore = finalScore;
@@ -116,7 +100,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		{
 			numControllerRequests = usedControllerRequests * 3;
 			setup();
-			load("double_dragon2.nes", "sav");
+			load("time_waster.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -125,7 +109,6 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			
 			while (!done) {}
 			
-			printResults();
 			System.out.println("Score of " + finalScore);
 			
 			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
@@ -151,7 +134,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		
 		tree2.setValidStates(validStates);
 		setup2();
-		load("double_dragon2.nes", "sav");
+		load("time_waster.nes", "sav");
 		makeModifications();
 		controller2.reset();
 		controller2.setCpuMem(cpuMem);
@@ -176,7 +159,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		{
 			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
-			load("double_dragon2.nes", "sav");
+			load("time_waster.nes", "sav");
 			makeModifications();
 			controller2.reset();
 			controller2.setCpuMem(cpuMem);
@@ -215,7 +198,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			tree.mutate(addressesAndValues);
 			previous = addressesAndValues;
 			setup();
-			load("double_dragon2.nes", "sav");
+			load("time_waster.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -224,7 +207,6 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			
 			while (!done) {}
 			
-			printResults();
 			System.out.println("Score of " + finalScore);
 			
 			previous = addressesAndValues;
@@ -255,7 +237,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			tree2.mutate(addressesAndValues2);
 			previous2 = addressesAndValues2;
 			setup2();
-			load("double_dragon2.nes", "sav");
+			load("time_waster.nes", "sav");
 			makeModifications();
 			controller2.reset();
 			controller2.setCpuMem(cpuMem);
@@ -338,7 +320,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			tree3.setRoot(tree.merge(tree2, addressesAndValues, addressesAndValues2));
 			tree3.reindexTree();
 			setup3();
-			load("double_dragon2.nes", "sav");
+			load("time_waster.nes", "sav");
 			makeModifications();
 			controller3.reset();
 			controller3.setCpuMem(cpuMem);
@@ -364,7 +346,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				numControllerRequests2 = 1000;
+				numControllerRequests2 = 5000;
 				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
@@ -378,7 +360,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			if (num == 1)
 			{
 				setup();
-				load("double_dragon2.nes", "sav");
+				load("time_waster.nes", "sav");
 				makeModifications();
 				controller.reset();
 				controller.setCpuMem(cpuMem);
@@ -397,7 +379,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			} else if (num == 2)
 			{
 				setup2();
-				load("double_dragon2.nes", "sav");
+				load("time_waster.nes", "sav");
 				makeModifications();
 				controller2.reset();
 				controller2.setCpuMem(cpuMem);
@@ -417,7 +399,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			else
 			{
 				setup3();
-				load("double_dragon2.nes", "sav");
+				load("time_waster.nes", "sav");
 				makeModifications();
 				controller3.reset();
 				controller3.setCpuMem(cpuMem);
@@ -443,7 +425,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon2.tree");
+			File file = new File("time_waster.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -470,7 +452,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon2.tree");
+			File file = new File("time_waster.tree");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -490,7 +472,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon2.tree2");
+			File file = new File("time_waster.tree2");
 			if (!file.exists())
 			{
 				return false;
@@ -517,7 +499,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("double_dragon2.tree2");
+			File file = new File("time_waster.tree2");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -535,18 +517,15 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	
 	private void setup()
 	{
-		livesLost = 0;
+		blocks = 0;
 		score = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {10697973, 11487544, 17532107, 18698877, 24017416,
-				25256304, 46632216, 47873712, 53382098, 54682506};
+		long[] startOnOffTimes = new long[] {6439097, 7140531};
 		clock = new Clock();
 		gui = new DecisionTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
-		long[] selectTimes = new long[] {37087201, 37712636, 40657682, 41310083};
-		((DecisionTreeGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
@@ -565,18 +544,15 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	
 	private void setup2()
 	{
-		livesLost = 0;
+		blocks = 0;
 		score = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {10697973, 11487544, 17532107, 18698877, 24017416,
-				25256304, 46632216, 47873712, 53382098, 54682506};
+		long[] startOnOffTimes = new long[] {6439097, 7140531};
 		clock = new Clock();
 		gui = new DecisionTreeGui(numControllerRequests2, firstUsableCycle, controller2, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
-		long[] selectTimes = new long[] {37087201, 37712636, 40657682, 41310083};
-		((DecisionTreeGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
@@ -595,18 +571,15 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	
 	private void setup3()
 	{
-		livesLost = 0;
+		blocks = 0;
 		score = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {10697973, 11487544, 17532107, 18698877, 24017416,
-				25256304, 46632216, 47873712, 53382098, 54682506};
+		long[] startOnOffTimes = new long[] {6439097, 7140531};
 		clock = new Clock();
 		gui = new DecisionTreeGui(Math.max(numControllerRequests, numControllerRequests2), firstUsableCycle, controller3, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
-		long[] selectTimes = new long[] {37087201, 37712636, 40657682, 41310083};
-		((DecisionTreeGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
@@ -655,11 +628,6 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		ppu.debugHold(false);
 	}
 	
-	private void printResults()
-	{
-		System.out.println("Game score = " + gameScore());
-	}
-	
 	private void on()
 	{
 		ppuThread = new Thread(ppu);
@@ -679,7 +647,7 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x432] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x00] = new NotifyChangesPort(this, clock); //Lives remaining
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -690,8 +658,8 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 			pause();
 			System.out.println("Done");
 			startedDone = true;
-			++livesLost;
 			score = gameScore();
+			System.out.println("Game score = " + score);
 			finalScore = score;
 			done = true;
 			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
@@ -716,14 +684,11 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x432].read() == 0)
+			if (cpu.getMem().getLayout()[0x00].read() == 0)
 			{
 				setDone(cycle);
 				return;
 			}
-			
-			++livesLost;
-			System.out.println("Died");
 		}
 		
 		cont();
@@ -731,14 +696,8 @@ public class DoubleDragon2DecisionTree implements AiAgent {
 	
 	private long gameScore()
 	{
-		long retval = 0;
-		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x486].read());
-		retval += val;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x487].read());
-		retval += val * 256;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x488].read());
-		retval += val * 256 * 256;
-		
+		long retval = Byte.toUnsignedLong(cpu.getMem().getLayout()[59].read());
+		retval += 256 * Byte.toUnsignedLong(cpu.getMem().getLayout()[60].read());
 		return retval;
 	}
 	

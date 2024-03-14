@@ -48,6 +48,8 @@ public class PunchOutDecisionTree implements AiAgent {
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
 	
+	private long usedControllerRequests;
+	
 	private static int A = 0x80;
 	private static int B = 0x40;
 	private static int UP = 0x20;
@@ -107,7 +109,7 @@ public class PunchOutDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("punch_out.nes", "sav");
 			makeModifications();
@@ -169,7 +171,7 @@ public class PunchOutDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("punch_out.nes", "sav");
 			makeModifications();
@@ -231,10 +233,7 @@ public class PunchOutDecisionTree implements AiAgent {
 				highScore = score;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -287,21 +286,14 @@ public class PunchOutDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = score;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = usedControllerRequests * 3;
 				
 					tree2.persist();
 				}
@@ -324,12 +316,8 @@ public class PunchOutDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -373,10 +361,8 @@ public class PunchOutDecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 40000;
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -703,6 +689,7 @@ public class PunchOutDecisionTree implements AiAgent {
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
 		cpu.getMem().getLayout()[0x01] = new NotifyChangesPort(this, clock);
+		cpu.getMem().getLayout()[0x0a] = new NotifyChangesPort(this, clock);
 		cpu.getMem().getLayout()[0x391] = new TrackSumOfSubtractionsPort(this, clock, true);
 		cpu.getMem().getLayout()[0x398] = new TrackSumOfSubtractionsPort(this, clock, false);
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
@@ -722,6 +709,7 @@ public class PunchOutDecisionTree implements AiAgent {
 			cont();
 			System.out.println("Screen scores size is " + screenScores.size());
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -742,7 +730,16 @@ public class PunchOutDecisionTree implements AiAgent {
 		pause();
 		
 		//We got pinged because of a level change or damage to us or our opponent
-		//We could be knocked out
+		//We could be knocked out, or a loss
+		
+		if (cpu.getMem().getLayout()[0x0a].read() == 1)
+		{
+			//Knocked out
+			knockOut = true;
+			System.out.println("Knocked out");
+			setDone(cycle);
+			return;
+		}
 		
 		if (cpu.getMem().getLayout()[0x01].read() > currentLevel)
 		{
@@ -758,20 +755,14 @@ public class PunchOutDecisionTree implements AiAgent {
 		}
 		else if (cpu.getMem().getLayout()[0x391].read() == 0)
 		{
-			if (!justFinishedLevel)
-			{
-				//Knocked out
-				knockOut = true;
-				System.out.println("Knocked out");
-				setDone(cycle);
-			}
-			else
+			if (justFinishedLevel)
 			{
 				justFinishedLevel = false;
 				((TrackSumOfSubtractionsPort)cpu.getMem().getLayout()[0x391]).reset();
 				((TrackSumOfSubtractionsPort)cpu.getMem().getLayout()[0x398]).reset();
 			}
 		}
+		
 		
 		cont();
 	}

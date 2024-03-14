@@ -44,6 +44,8 @@ public class AdventureIslandDecisionTree implements AiAgent {
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
 	
+	private long usedControllerRequests;
+	
 	private static int A = 0x80;
 	private static int B = 0x40;
 	private static int UP = 0x20;
@@ -103,7 +105,7 @@ public class AdventureIslandDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("adventure_island.nes", "sav");
 			makeModifications();
@@ -164,7 +166,7 @@ public class AdventureIslandDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("adventure_island.nes", "sav");
 			makeModifications();
@@ -231,10 +233,7 @@ public class AdventureIslandDecisionTree implements AiAgent {
 				}
 				
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -290,22 +289,15 @@ public class AdventureIslandDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					System.out.println("Saving");
 					highScore2 = finalScore;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = usedControllerRequests * 3;
 				
 					tree2.persist();
 				}
@@ -328,12 +320,8 @@ public class AdventureIslandDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -380,10 +368,8 @@ public class AdventureIslandDecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 5000;
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -691,7 +677,8 @@ public class AdventureIslandDecisionTree implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x3f] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x3f] = new NotifyChangesPort(this, clock); //lives
+		cpu.getMem().getLayout()[0x72] = new NotifyChangesPort(this, clock); //status
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -706,6 +693,7 @@ public class AdventureIslandDecisionTree implements AiAgent {
 			score = gameScore();
 			finalScore = score;
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -725,16 +713,26 @@ public class AdventureIslandDecisionTree implements AiAgent {
 	{
 		pause();
 		
+		if (cpu.getMem().getLayout()[0x3f].read() == 0)
+		{
+			livesLost = 2;
+		}
+		else if (livesLost >= 2)
+		{
+			livesLost = 0;
+		}
+		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x3f].read() == 1)
+			if (cpu.getMem().getLayout()[0x72].read() == (byte)0xff)
 			{
-				setDone(cycle);
-				return;
+				++livesLost;
+				if (livesLost == 3)
+				{
+					setDone(cycle);
+					return;
+				}
 			}
-			
-			++livesLost;
-			System.out.println("Died");
 		}
 		
 		cont();

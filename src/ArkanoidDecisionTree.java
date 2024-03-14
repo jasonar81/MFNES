@@ -44,6 +44,8 @@ public class ArkanoidDecisionTree implements AiAgent {
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
 	
+	private long usedControllerRequests;
+	
 	private static int A = 0x80;
 	private static int B = 0x40;
 	private static int UP = 0x20;
@@ -132,7 +134,7 @@ public class ArkanoidDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("arkanoid.nes");
 			makeModifications();
@@ -191,7 +193,7 @@ public class ArkanoidDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("arkanoid.nes");
 			makeModifications();
@@ -252,10 +254,7 @@ public class ArkanoidDecisionTree implements AiAgent {
 				highScore = finalScore;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -308,21 +307,14 @@ public class ArkanoidDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = finalScore;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = usedControllerRequests * 3;
 				
 					tree2.persist();
 				}
@@ -345,12 +337,8 @@ public class ArkanoidDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -394,10 +382,8 @@ public class ArkanoidDecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 5000;
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -713,6 +699,7 @@ public class ArkanoidDecisionTree implements AiAgent {
 			System.out.println("Game score = " + score);
 			finalScore = score;
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	

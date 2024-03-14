@@ -30,6 +30,7 @@ public class ContraDecisionTree implements AiAgent {
 	private volatile boolean startedDone;
 	private volatile ArrayList<Long> deaths = new ArrayList<Long>();
 	private volatile long score;
+	private volatile long possibleScoreIncrement;
 	
 	private static ContraDecisionTree instance;
 	
@@ -39,8 +40,6 @@ public class ContraDecisionTree implements AiAgent {
 	private volatile long remainingLives;
 	private volatile long previousRemainingLives;
 	private volatile long previousProgressShots;
-	private volatile ArrayList<Long> screenScores;
-	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	private NewMutatingDecisionTree tree;
 	private DecisionTreeController controller;
 	private long numControllerRequests = 5000;
@@ -49,6 +48,8 @@ public class ContraDecisionTree implements AiAgent {
 	private long numControllerRequests2 = 5000;
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
+	
+	private long usedControllerRequests;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -126,7 +127,6 @@ public class ContraDecisionTree implements AiAgent {
 		printResults();
 		System.out.println("Score of " + score);
 
-		processScreenResults();
 		highScore = score;
 		System.out.println("New high score!");
 		
@@ -136,7 +136,7 @@ public class ContraDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("contra.nes");
 			makeModifications();
@@ -149,8 +149,6 @@ public class ContraDecisionTree implements AiAgent {
 			
 			printResults();
 			System.out.println("Score of " + score);
-
-			processScreenResults();
 			
 			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
 	
@@ -198,7 +196,7 @@ public class ContraDecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("contra.nes");
 			makeModifications();
@@ -260,10 +258,7 @@ public class ContraDecisionTree implements AiAgent {
 				highScore = score;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -316,22 +311,14 @@ public class ContraDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = score;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
-				
+					numControllerRequests2 = usedControllerRequests * 3;				
 					tree2.persist();
 				}
 			}
@@ -353,12 +340,8 @@ public class ContraDecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -400,12 +383,10 @@ public class ContraDecisionTree implements AiAgent {
 				tree3.resetRoot();
 				tree.reindexTree();
 				tree2.reindexTree();
+				numControllerRequests2 = 5000;
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -578,7 +559,6 @@ public class ContraDecisionTree implements AiAgent {
 	
 	private void setup()
 	{
-		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousProgressCycle = 0;
 		previousProgressScore = 0;
@@ -612,7 +592,6 @@ public class ContraDecisionTree implements AiAgent {
 	
 	private void setup2()
 	{
-		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousProgressCycle = 0;
 		previousProgressScore = 0;
@@ -646,7 +625,6 @@ public class ContraDecisionTree implements AiAgent {
 	
 	private void setup3()
 	{
-		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousProgressCycle = 0;
 		previousProgressScore = 0;
@@ -753,25 +731,9 @@ public class ContraDecisionTree implements AiAgent {
 		if (!startedDone && !done)
 		{
 			startedDone = true;
-			long scoreDelta = getGameScore() - previousProgressScore;
-			System.out.println("There were " + deaths.size() + " deaths");
-			
-			long offset = getScreenOffset();
-			offset *= (256 * 256);
-			scoreDelta *= 256;
-			long shotsDelta = getTotalShots() - previousProgressShots;
-			
-			if (offset == 0)
-			{
-				shotsDelta = 0;
-			}
-			
-			score += (offset + scoreDelta + shotsDelta);
-			screenScores.add(offset + scoreDelta + shotsDelta);
-			screenScores = screenScores;
-			System.out.println("Screen scores size is " + screenScores.size());
-			System.out.println("Added " + (offset + scoreDelta) + " to score");
+			score += possibleScoreIncrement;
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -787,6 +749,15 @@ public class ContraDecisionTree implements AiAgent {
 		{
 			setDone(clock.getPpuExpectedCycle());
 		}
+		
+		long scoreDelta = getGameScore() - previousProgressScore;
+		System.out.println("There were " + deaths.size() + " deaths");
+		
+		long offset = getScreenOffset();
+		offset *= (256 * 256);
+		scoreDelta *= 256;
+		
+		possibleScoreIncrement = (offset + scoreDelta);
 	}
 	
 	private void pause()
@@ -821,7 +792,6 @@ public class ContraDecisionTree implements AiAgent {
 		System.out.println("Score " + scoreDelta + " points");
 		scoreDelta *= 256;
 		long shotsDelta = getTotalShots() - previousProgressShots;
-		System.out.println("Number of shots = " + shotsDelta);
 		if (shotsDelta > 255)
 		{
 			shotsDelta = 255;
@@ -831,48 +801,34 @@ public class ContraDecisionTree implements AiAgent {
 		previousProgressScore = currentScore;
 		previousRemainingLives = remainingLives;
 		previousProgressShots = getTotalShots();
-		score += (lives + timeScore + offset + scoreDelta + shotsDelta);
-		screenScores.add(lives + timeScore + offset + scoreDelta + shotsDelta);
-		screenScores = screenScores;
-		System.out.println("Screen scores size is " + screenScores.size());
-		System.out.println("Added " + (lives + timeScore + offset + scoreDelta) + " to score");
+		score += (lives + timeScore + offset + scoreDelta);
 		
 		cont();
 	}
 	
 	private int getGameScore()
 	{
-		return (cpu.getMem().read(0x07e3) << 8) + cpu.getMem().read(0x07e2);
+		int retval = (cpu.getMem().read(0x07e3) << 8) + cpu.getMem().read(0x07e2);
+		if (cpu.getMem().read(0x30) == 0 && cpu.getMem().read(0x64) == 0x0c)
+		{
+			//Count progress on beating level 1 boss that is not reflected in score
+			System.out.println("At level 1 boss");
+			int retvalBak = retval;
+			retval += (0x10 - cpu.getMem().read(0x583)) * 4;
+			retval += (0x10 - cpu.getMem().read(0x587)) * 4;
+			retval += (0x20 - cpu.getMem().read(0x585)) * 4;
+			
+			int hits = retval - retvalBak;
+			hits /= 4;
+			System.out.println("Hits on boss = " + hits);
+		}
+		
+		return retval;
 	}
 	
 	private long getScreenOffset()
 	{
 		return ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue();
-	}
-	
-	private boolean processScreenResults()
-	{
-		boolean retval = false;
-		for (int i = 0; i < screenScores.size(); ++i)
-		{
-			if (i < bestScreenScores.size())
-			{
-				if (screenScores.get(i) > bestScreenScores.get(i))
-				{
-					retval = true;
-					System.out.println("Screen " + i + " had a new best score of " + screenScores.get(i) + " old best was " + bestScreenScores.get(i));
-					bestScreenScores.set(i, screenScores.get(i));
-				}
-			}
-			else
-			{
-				retval = true;
-				System.out.println("Screen " + i + " was never played before. Got a score of " + screenScores.get(i));
-				bestScreenScores.add(screenScores.get(i));
-			}
-		}
-		
-		return retval;
 	}
 	
 	private long getTotalShots()

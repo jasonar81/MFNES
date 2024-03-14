@@ -413,6 +413,46 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	public boolean getRight() {
 		return right;
 	}
+	
+	@Override
+	public boolean getA2() {
+		return a;
+	}
+
+	@Override
+	public boolean getB2() {
+		return b;
+	}
+
+	@Override
+	public boolean getSelect2() {
+		return select;
+	}
+
+	@Override
+	public boolean getStart2() {
+		return start;
+	}
+
+	@Override
+	public boolean getUp2() {
+		return up;
+	}
+
+	@Override
+	public boolean getDown2() {
+		return down;
+	}
+
+	@Override
+	public boolean getLeft2() {
+		return left;
+	}
+
+	@Override
+	public boolean getRight2() {
+		return right;
+	}
 
 	@Override
 	public void writeAudioData(double data) {
@@ -465,6 +505,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 		}
 	}
 
+	/*
 	@Override
 	public boolean getA2() {
 		return false;
@@ -504,6 +545,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	public boolean getRight2() {
 		return false;
 	}
+	*/
 
 	@Override
 	public void setCpu(CPU cpu) {

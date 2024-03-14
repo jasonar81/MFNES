@@ -2,19 +2,18 @@
 
 import java.awt.event.KeyEvent;
 
-public class DecisionTreeGui extends DefaultGUI {
+public class TwoPlayerDecisionTreeGui extends DefaultGUI {
 	private long numControllerRequests;
 	private long firstUsableCycle;
 	private int state;
 	private long requests = 0;
-	private DecisionTreeController controller;
+	private TwoPlayerDecisionTreeController controller;
 	private long[] startOnOffTimes;
 	private Clock clock;
 	private long[] selectTimes = new long[0];
 	private long[] rightTimes = new long[0];
-	private boolean previousBState = false;
 	
-	public DecisionTreeGui(long numControllerRequests, long firstUsableCycle, DecisionTreeController controller, long[] startOnOffTimes, Clock clock)
+	public TwoPlayerDecisionTreeGui(long numControllerRequests, long firstUsableCycle, TwoPlayerDecisionTreeController controller, long[] startOnOffTimes, Clock clock)
 	{
 		this.numControllerRequests = numControllerRequests;
 		this.firstUsableCycle = firstUsableCycle;
@@ -58,9 +57,26 @@ public class DecisionTreeGui extends DefaultGUI {
 		
 		state = controller.getButtonState(clock.getPpuExpectedCycle());
 		++requests;
+		return Utils.getBit(state, 15);
+	}
+	
+	@Override
+	public boolean getA2() {
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
 		return Utils.getBit(state, 7);
 	}
-
+	
 	@Override
 	public boolean getB() {
 		if (clock.getPpuExpectedCycle() < firstUsableCycle)
@@ -75,13 +91,27 @@ public class DecisionTreeGui extends DefaultGUI {
 		
 		state = controller.getButtonState(clock.getPpuExpectedCycle());
 		++requests;
-		boolean retval = Utils.getBit(state, 6);
-		if (retval && !previousBState)
+		boolean retval = Utils.getBit(state, 14);
+		
+		return retval;
+	}
+
+	@Override
+	public boolean getB2() {
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
 		{
-			++totalBPresses;
+			return false;
 		}
 		
-		previousBState = retval;
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
+		boolean retval = Utils.getBit(state, 6);
+		
 		return retval;
 	}
 
@@ -97,6 +127,23 @@ public class DecisionTreeGui extends DefaultGUI {
 			}
 		}
 		
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
+		return Utils.getBit(state, 9);
+	}
+	
+	@Override
+	public boolean getSelect2() {
 		if (clock.getPpuExpectedCycle() < firstUsableCycle)
 		{
 			return false;
@@ -136,11 +183,45 @@ public class DecisionTreeGui extends DefaultGUI {
 		
 		state = controller.getButtonState(clock.getPpuExpectedCycle());
 		++requests;
+		return Utils.getBit(state, 8);
+	}
+	
+	@Override
+	public boolean getStart2() {
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
 		return Utils.getBit(state, 0);
 	}
 
 	@Override
 	public boolean getUp() {
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
+		return Utils.getBit(state, 13);
+	}
+	
+	@Override
+	public boolean getUp2() {
 		if (clock.getPpuExpectedCycle() < firstUsableCycle)
 		{
 			return false;
@@ -170,11 +251,45 @@ public class DecisionTreeGui extends DefaultGUI {
 		
 		state = controller.getButtonState(clock.getPpuExpectedCycle());
 		++requests;
+		return Utils.getBit(state, 12);
+	}
+	
+	@Override
+	public boolean getDown2() {
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
 		return Utils.getBit(state, 4);
 	}
 
 	@Override
 	public boolean getLeft() {
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
+		return Utils.getBit(state, 11);
+	}
+	
+	@Override
+	public boolean getLeft2() {
 		if (clock.getPpuExpectedCycle() < firstUsableCycle)
 		{
 			return false;
@@ -201,6 +316,23 @@ public class DecisionTreeGui extends DefaultGUI {
 			}
 		}
 		
+		if (clock.getPpuExpectedCycle() < firstUsableCycle)
+		{
+			return false;
+		}
+		
+		if (requests >= numControllerRequests)
+		{
+			agent.setDone(clock.getPpuExpectedCycle());
+		}
+		
+		state = controller.getButtonState(clock.getPpuExpectedCycle());
+		++requests;
+		return Utils.getBit(state, 10);
+	}
+	
+	@Override
+	public boolean getRight2() {
 		if (clock.getPpuExpectedCycle() < firstUsableCycle)
 		{
 			return false;

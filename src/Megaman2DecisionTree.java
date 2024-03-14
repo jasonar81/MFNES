@@ -45,6 +45,8 @@ public class Megaman2DecisionTree implements AiAgent {
 	private int previousLives = 0;
 	private int previousBossHp = 0;
 	
+	private long usedControllerRequests;
+	
 	private static int A = 0x80;
 	private static int B = 0x40;
 	private static int UP = 0x20;
@@ -112,7 +114,7 @@ public class Megaman2DecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("megaman2.nes", "sav");
 			makeModifications();
@@ -170,7 +172,7 @@ public class Megaman2DecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = usedControllerRequests * 3;
 			setup2();
 			load("megaman2.nes", "sav");
 			makeModifications();
@@ -230,10 +232,7 @@ public class Megaman2DecisionTree implements AiAgent {
 				highScore = score;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = usedControllerRequests * 3;
 				
 				tree.persist();
 			}
@@ -286,21 +285,14 @@ public class Megaman2DecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = score;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = usedControllerRequests * 3;
 				
 					tree2.persist();
 				}
@@ -323,12 +315,8 @@ public class Megaman2DecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = usedControllerRequests * 3;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -372,10 +360,8 @@ public class Megaman2DecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 5000;
+				numControllerRequests = usedControllerRequests * 3;
 			}
 		}
 	}
@@ -699,6 +685,7 @@ public class Megaman2DecisionTree implements AiAgent {
 			startedDone = true;
 			score += getScoreAtDeath();
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	

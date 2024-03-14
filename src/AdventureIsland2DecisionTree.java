@@ -44,6 +44,8 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 	private NewMutatingDecisionTree tree3;
 	private DecisionTreeController controller3;
 	
+	private long usedControllerRequests;
+	
 	private static int A = 0x80;
 	private static int B = 0x40;
 	private static int UP = 0x20;
@@ -107,7 +109,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests *= 3;
+			numControllerRequests = 3 * usedControllerRequests;
 			setup();
 			load("adventure_island2.nes", "sav");
 			makeModifications();
@@ -168,7 +170,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		
 		while (true)
 		{
-			numControllerRequests2 *= 3;
+			numControllerRequests2 = 3 * usedControllerRequests;
 			setup2();
 			load("adventure_island2.nes", "sav");
 			makeModifications();
@@ -231,10 +233,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 				highScore = finalScore;
 				System.out.println("New high score!");
 				saveTree();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 3;
-				}
+				numControllerRequests = 3 * usedControllerRequests;
 				
 				tree.persist();
 			}
@@ -288,21 +287,14 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = 3 * usedControllerRequests;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
 					highScore2 = finalScore;
 					saveTree2();
-					if (numControllerRequests2 < 300000000)
-					{
-						numControllerRequests2 *= 3;
-					}
+					numControllerRequests2 = 3 * usedControllerRequests;
 				
 					tree2.persist();
 				}
@@ -325,12 +317,8 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 					saveTree();
 					saveTree2();
 					long temp = numControllerRequests;
-					numControllerRequests = numControllerRequests2;
+					numControllerRequests = 3 * usedControllerRequests;
 					numControllerRequests2 = temp;
-					if (numControllerRequests < 300000000)
-					{
-						numControllerRequests *= 3;
-					}
 				}
 				else
 				{
@@ -375,10 +363,8 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 				tree2.reindexTree();
 				saveTree();
 				saveTree2();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests = Math.max(numControllerRequests, numControllerRequests2) * 3;
-				}
+				numControllerRequests2 = 5000;
+				numControllerRequests = 3 * usedControllerRequests;
 			}
 		}
 	}
@@ -469,6 +455,70 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 			ObjectInputStream i = new ObjectInputStream(f);
 	
 			tree = (NewMutatingDecisionTree)i.readObject();
+			
+			/*
+			IfElseNode node = tree.getRoot();
+			IfElseNode newRoot = new IfElseNode();
+			newRoot.address = 0x7d;
+			newRoot.checkValue = -1;
+			newRoot.comparisonType = 0;
+			newRoot.terminal = false;
+			newRoot.right = node;
+			node.parent = newRoot;
+			
+			IfElseNode left = new IfElseNode();
+			left.terminal = false;
+			left.address = 0x1a;
+			left.checkValue = 8;
+			left.comparisonType = 0;
+			newRoot.left = left;
+			left.parent = newRoot;
+			
+			IfElseNode leftLeft = new IfElseNode();
+			leftLeft.terminal = true;
+			leftLeft.terminalValue = 0;
+			left.left = leftLeft;
+			leftLeft.parent = left;
+			
+			IfElseNode leftRight = new IfElseNode();
+			leftRight.terminal = trIfElseNode node = tree.getRoot();
+			IfElseNode newRoot = new IfElseNode();
+			newRoot.address = 0x7d;
+			newRoot.checkValue = -1;
+			newRoot.comparisonType = 0;
+			newRoot.terminal = false;
+			newRoot.right = node;
+			node.parent = newRoot;
+			
+			IfElseNode left = new IfElseNode();
+			left.terminal = false;
+			left.address = 0x1a;
+			left.checkValue = 8;
+			left.comparisonType = 0;
+			newRoot.left = left;
+			left.parent = newRoot;
+			
+			IfElseNode leftLeft = new IfElseNode();
+			leftLeft.terminal = true;
+			leftLeft.terminalValue = 0;
+			left.left = leftLeft;
+			leftLeft.parent = left;
+			
+			IfElseNode leftRight = new IfElseNode();
+			leftRight.terminal = true;
+			leftRight.terminalValue = START;
+			left.right = leftRight;
+			leftRight.parent = left;
+			
+			tree.setRoot(newRoot);
+			tree.reindexTree();ue;
+			leftRight.terminalValue = START;
+			left.right = leftRight;
+			leftRight.parent = left;
+			
+			tree.setRoot(newRoot);
+			tree.reindexTree();
+			*/
 			controller = new DecisionTreeController(tree.getRoot());
 	
 			i.close();
@@ -690,6 +740,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
 		cpu.getMem().getLayout()[0x7d2] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x76] = new NotifyChangesPort(this, clock); //dying status
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -698,12 +749,11 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		if (!startedDone && !done)
 		{
 			pause();
-			System.out.println("Done");
 			startedDone = true;
-			++livesLost;
 			score = gameScore();
 			finalScore = score;
 			done = true;
+			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -725,14 +775,16 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x7d2].read() == 0)
+			if (cpu.getMem().getLayout()[0x76].read() == 1)
 			{
-				setDone(cycle);
-				return;
+				++livesLost;
+				System.out.println("Died");
+				if (cpu.getMem().getLayout()[0x7d2].read() == 0)
+				{
+					setDone(cycle);
+					return;
+				}
 			}
-			
-			++livesLost;
-			System.out.println("Died");
 		}
 		
 		cont();
