@@ -169,6 +169,13 @@ public class Contra2PDecisionTree implements AiAgent {
 		if (!loadTree2())
 		{
 			tree2 = new TwoPlayerMutatingDecisionTree(validStates);
+			IfElseNode[] clones = tree2.getRootsClones();
+			clones[0].terminal = true;
+			clones[0].terminalValue = RIGHT;
+			clones[1].terminal = true;
+			clones[1].terminalValue = RIGHT;
+			tree2.setRoots(clones);
+			tree2.reindex();
 			controller2 = new TwoPlayerDecisionTreeController(tree2);
 		}
 		
@@ -749,7 +756,8 @@ public class Contra2PDecisionTree implements AiAgent {
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
 		cpu.getMem().getLayout()[0x34] = new RomMemoryPort((byte)0); //Fix the randomizer value
-		//cpu.getMem().getLayout()[0x32] = new RomMemoryPort((byte)63); //Always report back 63 lives remaining
+		//cpu.getMem().getLayout()[0x32] = new RomMemoryPort((byte)2); //Always report back 63 lives remaining
+		//cpu.getMem().getLayout()[0x33] = new RomMemoryPort((byte)2); //Always report back 63 lives remaining
 		cpu.getMem().getLayout()[0x3a] = new DoneRamPort((byte)2, this, clock); //When continues decrements to 2, call it a wrap
 		cpu.getMem().getLayout()[0x65] = new SaveMaxValuePort(); //Distance into current screen
 		cpu.getMem().getLayout()[0x64] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x65], false, true, this, clock); //Screen number in level
@@ -781,8 +789,8 @@ public class Contra2PDecisionTree implements AiAgent {
 		if (remainingLives == 0)
 		{
 			setDone(clock.getPpuExpectedCycle());
+			return;
 		}
-		
 		long scoreDelta = getGameScore() - previousProgressScore;
 		System.out.println("There were " + deaths.size() + " deaths");
 		

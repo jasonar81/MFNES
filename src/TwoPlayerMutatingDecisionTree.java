@@ -118,8 +118,7 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 		root1.clearCounts();
 		root2.clearCounts();
 		
-		//int numChanges = (Math.abs(ThreadLocalRandom.current().nextInt()) % 2) + 1;
-		int numChanges = 1;
+		int numChanges = (Math.abs(ThreadLocalRandom.current().nextInt()) % 2) + 1;
 		int changes = 0;
 		while (true)
 		{
