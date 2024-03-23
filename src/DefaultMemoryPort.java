@@ -1,6 +1,9 @@
 //The default implementation of a memory address
+import java.io.Serializable;
 
-public class DefaultMemoryPort implements MemoryPort {
+public class DefaultMemoryPort implements MemoryPort, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private byte val;
 	
 	public DefaultMemoryPort()

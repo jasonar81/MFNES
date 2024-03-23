@@ -73,6 +73,74 @@ public class TimeWasterDecisionTree implements AiAgent {
 		if (!loadTree())
 		{	
 			tree = new NewMutatingDecisionTree(validStates);
+			
+			/*
+			IfElseNode root = new IfElseNode();
+			root.address = 9;
+			root.address2 = 35;
+			root.comparisonType = 13;
+			root.terminal = false;
+			
+			IfElseNode l = new IfElseNode();
+			l.address = 9;
+			l.address2 = 4;
+			l.comparisonType = 14;
+			l.terminal = false;
+			
+			root.left = l;
+			l.parent = root;
+			
+			IfElseNode ll = new IfElseNode();
+			ll.address = 7;
+			ll.address2 = 2;
+			ll.comparisonType = 14;
+			ll.terminal = false;
+			
+			l.left = ll;
+			ll.parent = l;
+			
+			IfElseNode lll = new IfElseNode();
+			lll.terminal = true;
+			lll.terminalValue = LEFT;
+			
+			ll.left = lll;
+			lll.parent = ll;
+			
+			IfElseNode llr = new IfElseNode();
+			llr.address = 7;
+			llr.address2 = 3;
+			llr.comparisonType = 13;
+			llr.terminal = false;
+			
+			ll.right = llr;
+			llr.parent = ll;
+			
+			IfElseNode llrl = new IfElseNode();
+			llrl.terminal = true;
+			llrl.terminalValue = RIGHT;
+			
+			llr.left = llrl;
+			llrl.parent = llr;
+			
+			IfElseNode llrr = new IfElseNode();
+			llrr.terminal = true;
+			llrr.terminalValue = 0;
+			
+			llr.right = llrr;
+			llrr.parent = llr;
+			
+			IfElseNode lr = elseTree();
+			l.right = lr;
+			lr.parent = l;
+			
+			IfElseNode r = elseTree();
+			root.right = r;
+			r.parent = root;
+			
+			tree.setRoot(root);
+			tree.reindexTree();
+			*/
+			
 			controller = new DecisionTreeController(tree.getRoot());
 		}
 		
@@ -355,6 +423,7 @@ public class TimeWasterDecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		double minFinalScore = finalScore;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -416,8 +485,14 @@ public class TimeWasterDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (finalScore < minFinalScore)
+			{
+				minFinalScore = finalScore;
+			}
 		}
 		
+		finalScore = minFinalScore;
 		return true;
 	}
 	
@@ -704,5 +779,46 @@ public class TimeWasterDecisionTree implements AiAgent {
 	@Override
 	public void setDeath(long cycle) {
 		//Easier just to handle in progress()
+	}
+	
+	private IfElseNode elseTree()
+	{
+		IfElseNode root = new IfElseNode();
+		root.address = 33;
+		root.address2 = 2;
+		root.comparisonType = 14;
+		root.terminal = false;
+		
+		IfElseNode l = new IfElseNode();
+		l.terminal = true;
+		l.terminalValue = LEFT;
+		
+		root.left = l;
+		l.parent = root;
+		
+		IfElseNode r = new IfElseNode();
+		r.address = 33;
+		r.address2 = 3;
+		r.comparisonType = 13;
+		r.terminal = false;
+		
+		root.right = r;
+		r.parent = root;
+		
+		IfElseNode rl = new IfElseNode();
+		rl.terminal = true;
+		rl.terminalValue = RIGHT;
+		
+		r.left = rl;
+		rl.parent = r;
+		
+		IfElseNode rr = new IfElseNode();
+		rr.terminal = true;
+		rr.terminalValue = 0;
+		
+		r.right = rr;
+		rr.parent = r;
+		
+		return root;
 	}
 }

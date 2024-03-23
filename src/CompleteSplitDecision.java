@@ -2,7 +2,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 public class CompleteSplitDecision implements Serializable {
-	private static final long serialVersionUID = 6635695383037681711L;
+private static final long serialVersionUID = -6732487624928621347L;
+
 	int address;
 	boolean terminal;
 	ArrayList<Integer> splits = new ArrayList<Integer>();

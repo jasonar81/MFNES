@@ -1,10 +1,13 @@
 //Used by AI to report a player death
+import java.io.Serializable;
 
-public class DeathPort implements MemoryPort {
+public class DeathPort implements MemoryPort, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private byte val;
 	private byte lookoutVal;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	
 	public DeathPort(byte lookoutVal, AiAgent agent, Clock clock)
 	{

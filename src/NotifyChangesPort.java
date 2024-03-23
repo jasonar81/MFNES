@@ -2,8 +2,8 @@
 
 public class NotifyChangesPort implements MemoryPort {
 	private byte val;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	private boolean hold = false;
 	
 	public NotifyChangesPort(AiAgent agent, Clock clock)

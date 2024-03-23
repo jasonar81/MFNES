@@ -5,10 +5,15 @@
 //One noise channel
 //One delta coded PCM channel
 
-public class APU implements Runnable {
-	private CPU cpu;
-	private GUI gui;
-	private Clock clock;
+import java.io.Serializable;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+public class APU implements Runnable, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
+	private transient CPU cpu;
+	private transient GUI gui;
+	private transient Clock clock;
 	private long previous = -3;
 	private int audioEnableFlags = 0;
 	private boolean dmcInterruptFlag = false;
@@ -108,11 +113,64 @@ public class APU implements Runnable {
 	
 	private volatile boolean disableFrameInterrupts = false;
 	
+	private transient AtomicBoolean syncRequested = new AtomicBoolean(false);
+	private transient AtomicBoolean syncGranted = new AtomicBoolean(false);
+	
 	public APU(CPU cpu, GUI gui, Clock clock) 
 	{
 		this.cpu = cpu;
 		this.gui = gui;
 		this.clock = clock;
+	}
+	
+	public void setRestart()
+	{
+		resetSync();
+	}
+	
+	public void resetSync()
+	{
+		syncRequested = new AtomicBoolean(false);
+		syncGranted = new AtomicBoolean(false);
+	}
+	
+	public void setCpu(CPU cpu)
+	{
+		this.cpu = cpu;
+	}
+	
+	public void setGui(GUI gui)
+	{
+		this.gui = gui;
+	}
+	
+	public void setClock(Clock clock)
+	{
+		this.clock = clock;
+	}
+	
+	public void sync1()
+	{
+		syncRequested.set(true);
+	}
+	
+	public synchronized void sync()
+	{
+		if (syncRequested.get())
+		{
+			syncGranted.set(true);
+			syncRequested.set(false);
+		}
+	}
+	
+	public boolean sync2()
+	{
+		return syncGranted.get();
+	}
+	
+	public void release()
+	{
+		syncGranted.set(false);
 	}
 	
 	public void run()
@@ -123,12 +181,23 @@ public class APU implements Runnable {
 			for (long i = previous + 3; i <= current; i += 3)
 			{
 				runPerCycleAudioLogic(i);
+				if (syncRequested.get())
+				{
+					sync();
+					while (syncGranted.get()) {}
+				}
 			}
 			previous = current;
 			
 			if (reset)
 			{
 				reset();
+			}
+			
+			if (syncRequested.get())
+			{
+				sync();
+				while (syncGranted.get()) {}
 			}
 		}
 	}

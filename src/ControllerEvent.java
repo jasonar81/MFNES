@@ -1,6 +1,9 @@
 //Used by AI
+import java.io.Serializable;
 
-public class ControllerEvent {
+public class ControllerEvent implements Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private long cycle;
 	private boolean down;
 	private int code;

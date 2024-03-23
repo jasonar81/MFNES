@@ -370,6 +370,7 @@ public class PunchOutDecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		long minFinalScore = score;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -431,8 +432,14 @@ public class PunchOutDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (score < minFinalScore)
+			{
+				minFinalScore = score;
+			}
 		}
 		
+		score = minFinalScore;
 		return true;
 	}
 	
@@ -703,7 +710,7 @@ public class PunchOutDecisionTree implements AiAgent {
 			System.out.println("Done");
 			//Events list ran out
 			startedDone = true;
-			long screenScore = partialScore(knockOut);
+			long screenScore = partialScore(knockOut, totalTime);
 			screenScores.add(screenScore);
 			score += screenScore;
 			cont();
@@ -782,7 +789,7 @@ public class PunchOutDecisionTree implements AiAgent {
 		return (enemyDamage << 24) + ((256 * 9 - myDamage) << 8) + (255 - seconds / 10); 
 	}
 	
-	private long partialScore(boolean ko)
+	private long partialScore(boolean ko, long cycle)
 	{
 		long enemyDamage = enemyDamage();
 		long myDamage = myDamage();
@@ -798,8 +805,13 @@ public class PunchOutDecisionTree implements AiAgent {
 			myDamage = 256 * 9;
 		}
 		
-		long seconds = 255 * 10;
-		return (enemyDamage << 24) + ((256 * 9 - myDamage) << 8) + (255 - seconds / 10); 
+		long seconds = (long)((cycle - previousCycle) / 5369317.5);
+		if (seconds > 2550)
+		{
+			seconds = 2550;
+		}
+		
+		return (enemyDamage << 24) + ((256 * 9 - myDamage) << 8) + (seconds / 10); 
 	}
 	
 	private boolean processScreenResults()

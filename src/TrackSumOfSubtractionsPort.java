@@ -2,8 +2,8 @@
 
 public class TrackSumOfSubtractionsPort implements MemoryPort {
 	private byte val;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	private volatile int sum = 0;
 	private boolean report;
 	

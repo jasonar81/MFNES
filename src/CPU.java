@@ -1,6 +1,7 @@
 //Ye old 6502 without BCD support
 
 import java.io.FileWriter;
+import java.io.Serializable;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.PrintWriter;
@@ -13,7 +14,9 @@ import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.SourceDataLine;
 
-public class CPU implements Runnable {
+public class CPU implements Runnable, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private Clock clock;
 	private Memory mem;
 	private volatile int pc;
@@ -30,14 +33,15 @@ public class CPU implements Runnable {
 	private AtomicBoolean reset;
 	private AtomicBoolean stepFlag;
 	private AtomicBoolean irq;
-	private PPU ppu;
-	private PrintStream log;
+	private transient PPU ppu;
+	private transient PrintStream log;
 	private volatile PrintStream out;
 	private long overage = 0;
 	private boolean inNmi = false;
-	private GUI gui;
-	private APU apu;
+	private transient GUI gui;
+	private transient APU apu;
 	private boolean check = false;
+	private boolean restart = false;
 	
 	public static volatile boolean LOG = false;
 	
@@ -81,6 +85,31 @@ public class CPU implements Runnable {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public void setRestart()
+	{
+		restart = true;
+	}
+	
+	public void setClock(Clock clock)
+	{
+		this.clock = clock;
+	}
+	
+	public void setMem(Memory mem)
+	{
+		this.mem = mem;
+	}
+	
+	public void setPpu(PPU ppu)
+	{
+		this.ppu = ppu;
+	}
+	
+	public void setGui(GUI gui)
+	{
+		this.gui = gui;
 	}
 	
 	public void enableChecking()
@@ -216,8 +245,12 @@ public class CPU implements Runnable {
 
 	@Override
 	public void run() {
-		setReset();
-		cycle = 0;
+		if (!restart)
+		{
+			setReset();
+			cycle = 0;
+		}
+		
 		while (true)
 		{
 			if (LOG)
@@ -3542,11 +3575,6 @@ public class CPU implements Runnable {
 				}
 				
 				expected = clock.getPpuExpectedCycle();
-			}
-			
-			if (expected - cycle > 3)
-			{
-				System.out.println(expected - cycle);
 			}
 		}
 		

@@ -2,9 +2,10 @@
 //Generate the data from every frame in the video and sends it to the GUI
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class PPU implements Runnable {
+public class PPU implements Runnable, Serializable  {
 	private Clock clock;
 	private Memory mem;
 	
@@ -20,7 +21,7 @@ public class PPU implements Runnable {
 	private int frameScroll; //Fixes the vertical scroll at the start of the frame
 	private long frameStart;
 	private CPU cpu;
-	private GUI gui;
+	private transient GUI gui;
 	private byte[] nameTableBytes = new byte[272];
 	private byte[] attributeBytes = new byte[272];
 	private byte[] patternBytes = new byte[272];
@@ -54,6 +55,10 @@ public class PPU implements Runnable {
 	private int[] colorLookup = new int[64];
 	private volatile int nametableSelect = -1;
 	private volatile int externallyReportedScanline;
+	private boolean restart = false;
+	
+	private transient AtomicBoolean syncRequested = new AtomicBoolean(false);
+	private transient AtomicBoolean syncGranted = new AtomicBoolean(false);
 	
 	public PPU(Clock clock, Memory mem, GUI gui)
 	{
@@ -141,6 +146,33 @@ public class PPU implements Runnable {
 		colorLookup[0x3d] = makeRGB(0xbd, 0xbd, 0xbd);
 		colorLookup[0x3e] = makeRGB(0, 0, 0);
 		colorLookup[0x3f] = makeRGB(0, 0, 0);
+	}
+	
+	public void resetSync()
+	{
+		syncRequested = new AtomicBoolean(false);
+		syncGranted = new AtomicBoolean(false);
+	}
+	
+	public void setRestart()
+	{
+		restart = true;
+		resetSync();
+	}
+	
+	public void setClock(Clock clock)
+	{
+		this.clock = clock;
+	}
+	
+	public void setMem(Memory mem)
+	{
+		this.mem = mem;
+	}
+	
+	public void setGui(GUI gui)
+	{
+		this.gui = gui;
 	}
 	
 	public int getScanline()
@@ -416,8 +448,12 @@ public class PPU implements Runnable {
 
 	@Override
 	public void run() {
-		cycle = 0;
-		frameStart = cycle;
+		if (!restart)
+		{
+			cycle = 0;
+			frameStart = cycle;
+		}
+		
 		while (true)
 		{
 			if (terminate.get())
@@ -1287,6 +1323,30 @@ public class PPU implements Runnable {
 		return retval;
 	}
 	
+	public void sync1()
+	{
+		syncRequested.set(true);
+	}
+	
+	public synchronized void sync()
+	{
+		if (syncRequested.get())
+		{
+			syncGranted.set(true);
+			syncRequested.set(false);
+		}
+	}
+	
+	public boolean sync2()
+	{
+		return syncGranted.get();
+	}
+	
+	public void release()
+	{
+		syncGranted.set(false);
+	}
+	
 	public void incrementCycle()
 	{
 		clock.setPpuExpectedCycle(++cycle);
@@ -1296,6 +1356,12 @@ public class PPU implements Runnable {
 			if (terminate.get())
 			{
 				return;
+			}
+			
+			if (syncRequested.get())
+			{
+				sync();
+				while (syncGranted.get()) {}
 			}
 			
 			expected = clock.getCpuExpectedCycle();

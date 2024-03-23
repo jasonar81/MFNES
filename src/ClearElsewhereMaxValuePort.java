@@ -1,7 +1,10 @@
 //Wacky memory port used by AI that can report progress and clear
 //the max values in other ports
+import java.io.Serializable;
 
-public class ClearElsewhereMaxValuePort implements MemoryPort {
+public class ClearElsewhereMaxValuePort implements MemoryPort, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private byte val;
 	private ClearablePort other;
 	private boolean onZero;

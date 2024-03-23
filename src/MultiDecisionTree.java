@@ -1,3 +1,7 @@
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -5,34 +9,60 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class NewMutatingDecisionTree implements Serializable {
+public class MultiDecisionTree implements Serializable {
 private static final long serialVersionUID = -6732487624928621347L;
 
 	private ArrayList<Integer> validStates;
-	private IfElseNode root;
-	private int treeSize;
-	private IfElseNode backup;
+	private HashMap<ArrayList<Integer>, IfElseNode> roots;
+	private HashMap<ArrayList<Integer>, Integer> treeSizes;
+	private transient IfElseNode backup;
+	private ArrayList<Integer> sceneAddresses;
+	private ArrayList<Integer> disallow;
+	private int defaultVal;
+	private transient boolean runAllMode;
+	private transient ArrayList<ArrayList<Integer>> sceneOrder;
+	private transient Snapshotable snapshotAgent;
+	private transient HashMap<ArrayList<Integer>, Snapshot> snapshots;
+	private transient int sceneNum;
+	private transient boolean foundNextKey;
 	
-	private static HashSet<IfElseNode> alreadyDone = new HashSet<IfElseNode>();
-	private static int SIZE_LIMIT = 10000;
-	
-	public NewMutatingDecisionTree(ArrayList<Integer> validStates)
+	public MultiDecisionTree(ArrayList<Integer> validStates, ArrayList<Integer> sceneAddresses, int defaultVal, ArrayList<Integer> disallow)
 	{
 		this.validStates = validStates;
-		root = new IfElseNode();
-		root.terminal = true;
-		root.terminalValue = 0;
-		treeSize = 1;
-		root.myNum = 0;
+		roots = new HashMap<ArrayList<Integer>, IfElseNode>();
+		treeSizes = new HashMap<ArrayList<Integer>, Integer>();
+		this.sceneAddresses = sceneAddresses;
+		this.disallow = disallow;
+		this.defaultVal = defaultVal;
+		sceneOrder = new ArrayList<ArrayList<Integer>>();
+		snapshots = new HashMap<ArrayList<Integer>, Snapshot>();
 	}
 	
-	public void resetRoot()
+	public void makeWhole()
 	{
-		root = new IfElseNode();
-		root.terminal = true;
-		root.terminalValue = 0;
-		treeSize = 1;
-		root.myNum = 0;
+		sceneOrder = new ArrayList<ArrayList<Integer>>();
+		snapshots = new HashMap<ArrayList<Integer>, Snapshot>();
+	}
+	
+	public void setSnapshotAgent(Snapshotable snapshotAgent)
+	{
+		this.snapshotAgent = snapshotAgent;
+	}
+	
+	public boolean foundNextKey()
+	{
+		return foundNextKey;
+	}
+	
+	public void setRunSceneMode(int sceneNum)
+	{
+		runAllMode = false;
+		this.sceneNum = sceneNum;
+	}
+	
+	public void setRunAllMode()
+	{
+		runAllMode = true;
 	}
 	
 	public void setValidStates(ArrayList<Integer> validStates)
@@ -40,14 +70,9 @@ private static final long serialVersionUID = -6732487624928621347L;
 		this.validStates = validStates;
 	}
 	
-	public IfElseNode getRoot()
+	public void reindexTree(ArrayList<Integer> key)
 	{
-		return root;
-	}
-	
-	public void reindexTree()
-	{
-		treeSize = recomputeTreeSize(root, 0);
+		treeSizes.put(key, recomputeTreeSize(roots.get(key), 0));
 	}
 	
 	private void cleanseAav(HashSet<Integer> addressesAndValues)
@@ -89,17 +114,11 @@ private static final long serialVersionUID = -6732487624928621347L;
 		//Remove addresses that only have one value
 		cleanseAav(addressesAndValues);
 		
-		//Find nodes not doing anything
-		ArrayList<Integer> useless = findUselessNodes(root);
-		
-		System.out.println("We have " + addressesAndValues.size() + " address/value pairs");
+		IfElseNode root = roots.get(sceneOrder.get(sceneNum));
+		int treeSize = recomputeTreeSize(root, 0);
+		treeSizes.put(sceneOrder.get(sceneNum), treeSize);
 		backup = root.clone();
 		root.clearCounts();
-		
-		if (alreadyDone.size() >= SIZE_LIMIT)
-		{
-			alreadyDone.clear();
-		}
 		
 		//int numChanges = (Math.abs(ThreadLocalRandom.current().nextInt()) % 2) + 1;
 		int numChanges = 1;
@@ -136,14 +155,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 					continue;
 				}
 				
-				if (alreadyDone.contains(root))
-				{
-					revert();
-					changes = 0;
-					continue;
-				}
-				
-				alreadyDone.add(root);
 				return;
 			} 
 			else if (type == 1)
@@ -216,14 +227,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 							break;
 						}
 						
-						if (alreadyDone.contains(root))
+						if (disallow.contains(node.address) || disallow.contains(node.address2))
 						{
 							revert();
 							changes = 0;
 							break;
 						}
 						
-						alreadyDone.add(root);
 						return;
 					}
 					
@@ -267,14 +277,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 					continue;
 				}
 				
-				if (alreadyDone.contains(root))
+				if (disallow.contains(node.address) || disallow.contains(node.address2))
 				{
 					revert();
 					changes = 0;
 					continue;
 				}
 				
-				alreadyDone.add(root);
 				return;
 			} else if (type == 3)
 			{
@@ -345,14 +354,14 @@ private static final long serialVersionUID = -6732487624928621347L;
 								break;
 							}
 							
-							if (alreadyDone.contains(root))
+							if (disallow.contains(root.address) || disallow.contains(root.address2))
 							{
 								revert();
 								changes = 0;
 								break;
 							}
 							
-							alreadyDone.add(root);
+							roots.put(sceneOrder.get(sceneNum), root);
 							return;
 						}
 						
@@ -431,14 +440,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 								break;
 							}
 							
-							if (alreadyDone.contains(root))
+							if (disallow.contains(newNode.address) || disallow.contains(newNode.address2))
 							{
 								revert();
 								changes = 0;
 								break;
 							}
 							
-							alreadyDone.add(root);
 							return;
 						}
 						
@@ -455,20 +463,12 @@ private static final long serialVersionUID = -6732487624928621347L;
 				
 				int num = 0;
 				IfElseNode node = null;
-				if (useless.size() > 0)
-				{
-					num = Math.abs(ThreadLocalRandom.current().nextInt()) % useless.size();
-					node = getNode(root, useless.get(num));
-				}
-				else
+				num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
+				node = getNode(root, num);
+				while (node.terminal) 
 				{
 					num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
 					node = getNode(root, num);
-					while (node.terminal) 
-					{
-						num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
-						node = getNode(root, num);
-					}
 				}
 				
 				num = Math.abs(ThreadLocalRandom.current().nextInt()) % 9;
@@ -542,14 +542,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 					continue;
 				}
 				
-				if (alreadyDone.contains(root))
+				if (disallow.contains(node.address) || disallow.contains(node.address2))
 				{
 					revert();
 					changes = 0;
 					continue;
 				}
 				
-				alreadyDone.add(root);
 				return;
 			} else if (type == 5)
 			{
@@ -561,20 +560,12 @@ private static final long serialVersionUID = -6732487624928621347L;
 				
 				int num = 0;
 				IfElseNode node = null;
-				if (useless.size() > 0)
-				{
-					num = Math.abs(ThreadLocalRandom.current().nextInt()) % useless.size();
-					node = getNode(root, useless.get(num));
-				}
-				else
+				num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
+				node = getNode(root, num);
+				while (node.terminal) 
 				{
 					num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
 					node = getNode(root, num);
-					while (node.terminal) 
-					{
-						num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
-						node = getNode(root, num);
-					}
 				}
 				
 				if (node.comparisonType <= 2 || (node.comparisonType >= 9 && node.comparisonType <= 11))
@@ -595,14 +586,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 						continue;
 					}
 					
-					if (alreadyDone.contains(root))
+					if (disallow.contains(node.address) || disallow.contains(node.address2))
 					{
 						revert();
 						changes = 0;
 						continue;
 					}
 					
-					alreadyDone.add(root);
 					return;
 				}
 				else
@@ -626,14 +616,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 							continue;
 						}
 						
-						if (alreadyDone.contains(root))
+						if (disallow.contains(node.address) || disallow.contains(node.address2))
 						{
 							revert();
 							changes = 0;
 							continue;
 						}
 						
-						alreadyDone.add(root);
 						return;
 					}
 					else
@@ -654,14 +643,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 							continue;
 						}
 						
-						if (alreadyDone.contains(root))
+						if (disallow.contains(node.address) || disallow.contains(node.address2))
 						{
 							revert();
 							changes = 0;
 							continue;
 						}
 						
-						alreadyDone.add(root);
 						return;
 					}
 				}
@@ -675,20 +663,12 @@ private static final long serialVersionUID = -6732487624928621347L;
 				
 				int num = 0;
 				IfElseNode node = null;
-				if (useless.size() > 0)
-				{
-					num = Math.abs(ThreadLocalRandom.current().nextInt()) % useless.size();
-					node = getNode(root, useless.get(num));
-				}
-				else
+				num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
+				node = getNode(root, num);
+				while (node.terminal) 
 				{
 					num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
 					node = getNode(root, num);
-					while (node.terminal) 
-					{
-						num = Math.abs(ThreadLocalRandom.current().nextInt()) % treeSize;
-						node = getNode(root, num);
-					}
 				}
 				
 				if (node.comparisonType <= 2 || (node.comparisonType >= 9 && node.comparisonType <= 11))
@@ -709,14 +689,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 						continue;
 					}
 					
-					if (alreadyDone.contains(root))
-					{
-						revert();
-						changes = 0;
-						continue;
-					}
-					
-					alreadyDone.add(root);
 					return;
 				} else if (node.comparisonType >= 6 && node.checkValue < 9)
 				{
@@ -735,14 +707,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 						continue;
 					}
 					
-					if (alreadyDone.contains(root))
-					{
-						revert();
-						changes = 0;
-						continue;
-					}
-					
-					alreadyDone.add(root);
 					return;
 				}
 				else
@@ -755,13 +719,12 @@ private static final long serialVersionUID = -6732487624928621347L;
 	
 	public void revert()
 	{
-		root = backup.clone();
-		treeSize = recomputeTreeSize(root, 0);
+		roots.put(sceneOrder.get(sceneNum), backup);
+		treeSizes.put(sceneOrder.get(sceneNum), recomputeTreeSize(backup, 0));
 	}
 	
 	public void persist()
 	{
-		backup = root.clone();
 	}
 	
 	private int recomputeTreeSize(IfElseNode node, int nodeNum)
@@ -949,105 +912,85 @@ private static final long serialVersionUID = -6732487624928621347L;
 		return addresses.get(num);
 	}
 	
-	private ArrayList<Integer> findUselessNodes(IfElseNode node)
+	public void reset()
 	{
-		ArrayList<Integer> retval = new ArrayList<Integer>();
-		if (!node.terminal)
-		{
-			if (node.leftCount > 0 && node.rightCount == 0)
-			{
-				retval.add(node.myNum);
-			} else if (node.leftCount == 0 && node.rightCount >= 0)
-			{
-				retval.add(node.myNum);
-			}
-		}
-		
-		System.out.println(retval.size() + " useless nodes");
-		return retval;
+		sceneOrder.clear();
+		snapshots.clear();
 	}
-	
-	private HashSet<Integer> intersect(HashSet<Integer> left, HashSet<Integer> right)
-	{
-		HashSet<Integer> intersection = new HashSet<Integer>(left); 
-		intersection.retainAll(right);
-		return intersection;
-	}
-	
-	public IfElseNode merge(NewMutatingDecisionTree rhs, HashSet<Integer> addressesAndValues1, HashSet<Integer> addressesAndValues2)
-	{
-		HashSet<Integer> addressesAndValues = intersect(addressesAndValues1, addressesAndValues2);
-		IfElseNode left;
-		IfElseNode right;
-		
-		if (ThreadLocalRandom.current().nextBoolean())
+
+	public int run(int[] allRam) {
+		if (runAllMode)
 		{
-			left = root.clone();
-			right = rhs.root.clone();
-		}
-		else
-		{
-			left = rhs.root.clone();
-			right = root.clone();
-		}
-		
-		IfElseNode newNode = new IfElseNode();
-		newNode.right = right;
-		right.parent = newNode;
-		newNode.terminal = false;
-		newNode.left = left;
-		left.parent = newNode;
-		
-		//Pick an address and a value to use
-		int num = Math.abs(ThreadLocalRandom.current().nextInt()) % addressesAndValues.size();
-		int i = 0;
-		for (int x : addressesAndValues)
-		{
-			if (i == num)
+			ArrayList<Integer> key = new ArrayList<Integer>();
+			for (Integer address : sceneAddresses)
 			{
-				newNode.address = (x >> 8);
-				newNode.checkValue = (int)((byte)(x & 0xff));
-				num = Math.abs(ThreadLocalRandom.current().nextInt()) % 9;
-				newNode.comparisonType = num;
-				
-				if (num >= 3)
-				{
-					newNode.address2 = getOtherRandomAddress(left.address, addressesAndValues);
-					newNode.checkValue = 0;
-					if (num >= 6)
-					{
-						newNode.checkValue = Math.abs(ThreadLocalRandom.current().nextInt()) % 256;
-						if (Math.abs(ThreadLocalRandom.current().nextInt()) % 2 == 1)
-						{
-							newNode.checkValue *= -1;
-						}
-					}
-				}
-				else
-				{
-					newNode.address2 = 0;
-				}
-				
-				if (num < 6)
-				{
-					boolean flip = ThreadLocalRandom.current().nextBoolean();
-					if (flip)
-					{
-						newNode.comparisonType += 9;
-					}
-				}
-				
-				return newNode;
+				key.add(allRam[address]);
 			}
 			
-			++i;
+			if (!roots.containsKey(key))
+			{
+				IfElseNode root = new IfElseNode();
+				root.terminal = true;
+				root.terminalValue = defaultVal;
+				roots.put(key, root);
+				reindexTree(key);
+			}
+			
+			if (!snapshots.containsKey(key))
+			{
+				sceneOrder.add(key);
+				snapshots.put(key, snapshotAgent.snapshot());
+			}
+			
+			return roots.get(key).run(allRam);
 		}
 		
-		return null;
+		foundNextKey = false;
+		ArrayList<Integer> key = new ArrayList<Integer>();
+		for (Integer address : sceneAddresses)
+		{
+			key.add(allRam[address]);
+		}
+		
+		if (!key.equals(sceneOrder.get(sceneNum)))
+		{
+			if (!sceneOrder.contains(key) || sceneOrder.indexOf(key) > sceneNum)
+			{
+				foundNextKey = true;
+				return -1;
+			}
+		}
+		
+		return roots.get(sceneOrder.get(sceneNum)).run(allRam);
 	}
 	
-	public void setRoot(IfElseNode root)
+	public int numSnapshots()
 	{
-		this.root = root;
+		return sceneOrder.size();
+	}
+	
+	public Snapshot getSnapshotForScene(int sceneNum)
+	{
+		Snapshot snapshot = snapshots.get(sceneOrder.get(sceneNum));
+		Snapshot retval = null;
+
+	    try {
+	    	ByteArrayOutputStream bos = new ByteArrayOutputStream();
+	    	ObjectOutputStream out = new ObjectOutputStream(bos);
+	        out.writeObject(snapshot);
+	        out.flush();
+	        out.close();
+	        byte[] bytes = bos.toByteArray();
+	        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+
+	        ObjectInputStream in = new ObjectInputStream(bis);
+            retval = (Snapshot)in.readObject();
+            bis.close();
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        System.exit(-1);
+	    }
+		
+		return retval;
 	}
 }

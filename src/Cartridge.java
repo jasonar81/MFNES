@@ -1,7 +1,10 @@
 import java.nio.file.Files;
+import java.io.Serializable;
 import java.nio.file.Paths;
 
-public class Cartridge {
+public class Cartridge implements Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private int numPrg;
 	private int numChr;
 	private int mapper;

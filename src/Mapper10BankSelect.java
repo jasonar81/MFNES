@@ -1,5 +1,7 @@
+import java.io.Serializable;
+public class Mapper10BankSelect implements MemoryPort, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
 
-public class Mapper10BankSelect implements MemoryPort {
 	Memory cpuMem;
 	MemoryPort delegate;
 

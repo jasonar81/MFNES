@@ -1,6 +1,9 @@
 //Used by mappers
+import java.io.Serializable;
 
-public class Latch0Port extends TwoStateMemoryPort {
+public class Latch0Port extends TwoStateMemoryPort implements Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private Memory mem;
 	private int addr;
 	boolean setting;

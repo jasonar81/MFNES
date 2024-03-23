@@ -93,6 +93,13 @@ public class SmbDecisionTree implements AiAgent {
 		if (!loadTree())
 		{
 			tree = new NewMutatingDecisionTree(validStates);
+			
+			IfElseNode root = tree.getRoot();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			tree.setRoot(root);
+			tree.reindexTree();
+			
 			controller = new DecisionTreeController(tree.getRoot());
 		}
 		
@@ -381,7 +388,8 @@ public class SmbDecisionTree implements AiAgent {
 	
 	private boolean confirm(int num)
 	{
-		int NUM_CONFIRMS = 1;
+		int NUM_CONFIRMS = 2;
+		long minFinalScore = score;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -443,8 +451,14 @@ public class SmbDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (score < minFinalScore)
+			{
+				minFinalScore = score;
+			}
 		}
 		
+		score = minFinalScore;
 		return true;
 	}
 	

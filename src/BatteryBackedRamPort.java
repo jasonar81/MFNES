@@ -1,10 +1,13 @@
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.Serializable;
 
 //Use for cartridges that have save abilities
 
-public class BatteryBackedRamPort implements MemoryPort {
-	RandomAccessFile raf;
+public class BatteryBackedRamPort implements MemoryPort, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
+	transient RandomAccessFile raf;
 	int offset;
 	byte val;
 	
@@ -15,7 +18,7 @@ public class BatteryBackedRamPort implements MemoryPort {
 		try {
 			val = Utils.readByte(raf, offset);
 		} catch (IOException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
 		}
 	}
 	
@@ -28,13 +31,16 @@ public class BatteryBackedRamPort implements MemoryPort {
 	public void write(byte val) {
 		this.val = val;
 		
-		try
+		if (raf != null)
 		{
-			Utils.writeByte(raf, offset, val);
-		}
-		catch(Exception e)
-		{
-			e.printStackTrace();
+			try
+			{
+				Utils.writeByte(raf, offset, val);
+			}
+			catch(Exception e)
+			{
+				//e.printStackTrace();
+			}
 		}
 	}
 

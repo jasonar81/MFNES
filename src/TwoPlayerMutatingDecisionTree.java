@@ -6,7 +6,8 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class TwoPlayerMutatingDecisionTree implements Serializable {
-	private static final long serialVersionUID = -6732487624928621347L;
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private ArrayList<Integer> validStates;
 	private IfElseNode root1;
 	private int treeSize1;
@@ -204,6 +205,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 							}
 						}
 						
+						if (num < 6)
+						{
+							boolean flip = ThreadLocalRandom.current().nextBoolean();
+							if (flip)
+							{
+								node.comparisonType += 9;
+							}
+						}
+						
 						left.terminalValue = terminalValue;
 						reindex();
 						System.out.println("Changing terminal node to if/else");
@@ -309,6 +319,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 								root1.address2 = 0;
 							}
 							
+							if (num < 6)
+							{
+								boolean flip = ThreadLocalRandom.current().nextBoolean();
+								if (flip)
+								{
+									root1.comparisonType += 9;
+								}
+							}
+							
 							reindex();
 							System.out.println("Adding new node at root");
 							System.out.println("Tree size is now " + (treeSize1 + treeSize2));
@@ -368,6 +387,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 								root2.address2 = 0;
 							}
 							
+							if (num < 6)
+							{
+								boolean flip = ThreadLocalRandom.current().nextBoolean();
+								if (flip)
+								{
+									root2.comparisonType += 9;
+								}
+							}
+							
 							reindex();
 							System.out.println("Adding new node at root");
 							System.out.println("Tree size is now " + (treeSize1 + treeSize2));
@@ -424,6 +452,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 							else
 							{
 								newNode.address2 = 0;
+							}
+							
+							if (num < 6)
+							{
+								boolean flip = ThreadLocalRandom.current().nextBoolean();
+								if (flip)
+								{
+									newNode.comparisonType += 9;
+								}
 							}
 							
 							if (parent.left == node)
@@ -517,6 +554,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 						{
 							node.checkValue *= -1;
 						}
+					}
+				}
+				
+				if (num < 6)
+				{
+					boolean flip = ThreadLocalRandom.current().nextBoolean();
+					if (flip)
+					{
+						node.comparisonType += 9;
 					}
 				}
 				
@@ -956,6 +1002,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 					newNode.address2 = 0;
 				}
 				
+				if (num < 6)
+				{
+					boolean flip = ThreadLocalRandom.current().nextBoolean();
+					if (flip)
+					{
+						newNode.comparisonType += 9;
+					}
+				}
+				
 				break;
 			}
 			
@@ -1011,6 +1066,15 @@ public class TwoPlayerMutatingDecisionTree implements Serializable {
 				else
 				{
 					newNode.address2 = 0;
+				}
+				
+				if (num < 6)
+				{
+					boolean flip = ThreadLocalRandom.current().nextBoolean();
+					if (flip)
+					{
+						newNode.comparisonType += 9;
+					}
 				}
 				
 				break;

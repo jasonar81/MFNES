@@ -88,6 +88,13 @@ public class CastlevaniaDecisionTree implements AiAgent {
 		if (!loadTree())
 		{	
 			tree = new NewMutatingDecisionTree(validStates);
+			
+			IfElseNode root = tree.getRoot();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			tree.setRoot(root);
+			tree.reindexTree();
+			
 			controller = new DecisionTreeController(tree.getRoot());
 		}
 		
@@ -370,6 +377,7 @@ public class CastlevaniaDecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		double minFinalScore = finalScore;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -431,8 +439,14 @@ public class CastlevaniaDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (finalScore < minFinalScore)
+			{
+				minFinalScore = finalScore;
+			}
 		}
 		
+		finalScore = minFinalScore;
 		return true;
 	}
 	
@@ -744,11 +758,27 @@ public class CastlevaniaDecisionTree implements AiAgent {
 		long level = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x28].read());
 		long offset = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x40].read());
 		offset += 256 * Byte.toUnsignedLong(cpu.getMem().getLayout()[0x41].read());
+		long yPos = cpu.getMem().getLayout()[0x3f].read();
+		long floor = cpu.getMem().getLayout()[0x46].read();
 		
 		System.out.println("Level = " + level);
 		System.out.println("Offset = " + offset);
 		System.out.println("Game score = " + gameScore);
 		
-		return (level << 32) + (offset << 16) + gameScore;
+		long retval = (level << 32) + gameScore;
+		
+		if (level == 2 && yPos == (byte)0xc0 && offset <= 264 && offset >= 50 && floor == 1)
+		{
+			offset += (264 - offset);
+		} else if (level == 2 && floor == 0 && offset >= 72 && offset <= 457)
+		{
+			offset += 478;
+		} else if (level == 2 && floor == 1 && offset >= 378)
+		{
+			offset += 990;
+		}
+		
+		retval += (offset << 16);
+		return retval;
 	}
 }

@@ -3,11 +3,11 @@
 public class SaveMaxValueAndClearElsewherePort implements MemoryPort, ClearablePort {
 	private byte val;
 	private volatile int maxValue = 0;
-	private ClearablePort other;
+	private transient ClearablePort other;
 	private boolean onZero;
 	private boolean progress;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	
 	public SaveMaxValueAndClearElsewherePort(MemoryPort other, boolean onZero, boolean progressOnChange, AiAgent agent, Clock clock)
 	{

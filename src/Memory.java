@@ -1,24 +1,27 @@
 //Either the CPU or PPU memory
 
 import java.io.File;
+import java.io.Serializable;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Scanner;
 
-public class Memory {
+public class Memory implements Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	public static int CPU = 0;
 	public static int PPU = 1;
 	public static int MEMSIZE = 65536;
 	
 	private MemoryPort[] layout;
-	private PPU ppu;
+	private transient PPU ppu;
 	private int type;
 	private Cartridge cart;
-	private RandomAccessFile raf;
-	private CPU cpu;
-	private GUI gui;
+	private transient RandomAccessFile raf;
+	private transient CPU cpu;
+	private transient GUI gui;
 	private volatile int control = 0;
 	private String filename = "";
 	
@@ -37,6 +40,16 @@ public class Memory {
 		{
 			layout[i] = new DefaultMemoryPort();
 		}
+	}
+	
+	public void setGui(GUI gui)
+	{
+		this.gui = gui;
+	}
+	
+	public void setPpu(PPU ppu)
+	{
+		this.ppu = ppu;
 	}
 	
 	public MemoryPort[] getLayout()

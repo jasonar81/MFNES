@@ -373,7 +373,8 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 	
 	private boolean confirm(int num)
 	{
-		int NUM_CONFIRMS = 1;
+		int NUM_CONFIRMS = 2;
+		long minFinalScore = score;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -438,8 +439,14 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (score < minFinalScore)
+			{
+				minFinalScore = score;
+			}
 		}
 		
+		score = minFinalScore;
 		return true;
 	}
 	

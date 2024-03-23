@@ -1,6 +1,6 @@
 
 public class Register4017 implements MemoryPort {
-	private GUI gui;
+	private transient GUI gui;
 	private Register4016 r4016;
 	private APU apu;
 	private byte lastValue = 0;

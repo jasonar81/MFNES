@@ -6,12 +6,12 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 
 public class Register4016 implements MemoryPort {
-	private GUI gui;
+	private transient GUI gui;
 	public boolean hold = false;
 	public int counter = 0;
 	public int counter2 = 0;
 	private CPU cpu;
-	private PrintWriter log;
+	private transient PrintWriter log;
 	private boolean enableTracking = false;
 	private HashSet<Integer> tracking;
 	private long firstUsableCycle;

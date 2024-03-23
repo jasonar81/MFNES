@@ -373,7 +373,8 @@ public class DoubleDragonDecisionTree implements AiAgent {
 	
 	private boolean confirm(int num)
 	{
-		int NUM_CONFIRMS = 1;
+		int NUM_CONFIRMS = 2;
+		double minFinalScore = finalScore;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -435,8 +436,14 @@ public class DoubleDragonDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (finalScore < minFinalScore)
+			{
+				minFinalScore = finalScore;
+			}
 		}
 		
+		finalScore = minFinalScore;
 		return true;
 	}
 	

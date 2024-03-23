@@ -79,6 +79,13 @@ public class AdventureIslandDecisionTree implements AiAgent {
 		if (!loadTree())
 		{
 			tree = new NewMutatingDecisionTree(validStates);
+			
+			IfElseNode root = tree.getRoot();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			tree.setRoot(root);
+			tree.reindexTree();
+			
 			controller = new DecisionTreeController(tree.getRoot());
 		}
 		
@@ -377,6 +384,7 @@ public class AdventureIslandDecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		double minFinalScore = finalScore;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -441,8 +449,14 @@ public class AdventureIslandDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (finalScore < minFinalScore)
+			{
+				minFinalScore = finalScore;
+			}
 		}
 		
+		finalScore = minFinalScore;
 		return true;
 	}
 	
@@ -836,7 +850,10 @@ public class AdventureIslandDecisionTree implements AiAgent {
 		}
 		
 		retval += val * 10000000;
-
+		
+		int level = cpu.getMem().getLayout()[0x39].read() + cpu.getMem().getLayout()[0x38].read() * 4 + cpu.getMem().getLayout()[0x37].read() * 16;
+		
+		retval += level * 100000000;
 		return retval;
 	}
 	

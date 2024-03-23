@@ -1,4 +1,6 @@
 import java.awt.event.KeyEvent;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -12,7 +14,9 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class ContraDecisionTree implements AiAgent {
+import com.google.gson.Gson;
+
+public class ContraMultiTree implements AiAgent, Snapshotable {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -25,14 +29,13 @@ public class ContraDecisionTree implements AiAgent {
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
-	private volatile long highScore2 = 0;
 	private volatile boolean done;
 	private volatile boolean startedDone;
 	private volatile ArrayList<Long> deaths = new ArrayList<Long>();
 	private volatile long score;
 	private volatile long possibleScoreIncrement;
 	
-	private static ContraDecisionTree instance;
+	private static ContraMultiTree instance;
 	
 	private long firstUsableCycle = 62407559;
 	private volatile long previousProgressCycle;
@@ -40,15 +43,9 @@ public class ContraDecisionTree implements AiAgent {
 	private volatile long remainingLives;
 	private volatile long previousRemainingLives;
 	private volatile long previousProgressShots;
-	private NewMutatingDecisionTree tree;
-	private DecisionTreeController controller;
-	private long numControllerRequests = 5000;
-	private NewMutatingDecisionTree tree2;
-	private DecisionTreeController controller2;
-	private long numControllerRequests2 = 5000;
-	private NewMutatingDecisionTree tree3;
-	private DecisionTreeController controller3;
-	
+	private MultiDecisionTree tree;
+	private MultiTreeController controller;
+	private long numControllerRequests = 7500;
 	private long usedControllerRequests;
 	
 	private static int A = 0x80;
@@ -62,7 +59,7 @@ public class ContraDecisionTree implements AiAgent {
 	
 	public static void main(String[] args)
 	{
-		instance = new ContraDecisionTree();
+		instance = new ContraMultiTree();
 		instance.main();
 	}
 	
@@ -109,24 +106,25 @@ public class ContraDecisionTree implements AiAgent {
 		
 		if (!loadTree())
 		{
-			tree = new NewMutatingDecisionTree(validStates);
-			
-			IfElseNode root = tree.getRoot();
-			root.terminal = true;
-			root.terminalValue = RIGHT;
-			tree.setRoot(root);
-			tree.reindexTree();
-			
-			controller = new DecisionTreeController(tree.getRoot());
+			ArrayList<Integer> addresses = new ArrayList<Integer>();
+			addresses.add(0x30);
+			addresses.add(0x64);
+			ArrayList<Integer> disallow = new ArrayList<Integer>();
+			disallow.add(0x32);
+			tree = new MultiDecisionTree(validStates, addresses, RIGHT, disallow);
 		}
 		
+		tree.setSnapshotAgent(this);
+		controller = new MultiTreeController(tree);
 		tree.setValidStates(validStates);
 		setup();
 		load("contra.nes");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
-		controller.setTree(tree.getRoot());
+		controller.setTree(tree);
+		tree.setRunAllMode();
+		tree.reset();
 		run();
 		
 		while (!done) {}
@@ -137,8 +135,6 @@ public class ContraDecisionTree implements AiAgent {
 		highScore = score;
 		System.out.println("New high score!");
 		
-		HashSet<Integer> addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
-		HashSet<Integer> previous;
 		teardown();
 		
 		while (true)
@@ -149,18 +145,18 @@ public class ContraDecisionTree implements AiAgent {
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
-			controller.setTree(tree.getRoot());
+			controller.setTree(tree);
+			tree.setRunAllMode();
+			tree.reset();
 			run();
 			
 			while (!done) {}
 			
 			printResults();
 			System.out.println("Score of " + score);
-			
-			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
 	
 			teardown();
-			if (score > highScore && confirm(1))
+			if (score > highScore)
 			{
 				highScore = score;
 				System.out.println("New high score!");
@@ -172,316 +168,171 @@ public class ContraDecisionTree implements AiAgent {
 			}
 		}
 		
-		if (!loadTree2())
-		{
-			tree2 = new NewMutatingDecisionTree(validStates);
-			controller2 = new DecisionTreeController(tree2.getRoot());
-		}
-		
-		tree2.setValidStates(validStates);
-		setup2();
-		load("contra.nes");
-		makeModifications();
-		controller2.reset();
-		controller2.setCpuMem(cpuMem);
-		controller2.setTree(tree2.getRoot());
-		run();
-		
-		while (!done) {}
-		
-		System.out.println("Score of " + score);
-
-		highScore2 = score;
-		if (highScore2 > highScore)
-		{
-			System.out.println("New high score!");
-		}
-		
-		HashSet<Integer> addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
-		HashSet<Integer> previous2;
-		teardown();
-		
+		int sceneNum = 0;
 		while (true)
 		{
-			numControllerRequests2 = usedControllerRequests * 3;
-			setup2();
-			load("contra.nes");
-			makeModifications();
-			controller2.reset();
-			controller2.setCpuMem(cpuMem);
-			controller2.setTree(tree2.getRoot());
-			run();
-			
-			while (!done) {}
-			
-			System.out.println("Score of " + score);
-			
-			addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
-	
-			teardown();
-			if (score > highScore2 && confirm(2))
+			//play screen until no deaths 
+			System.out.println("Working on scene " + sceneNum);
+			while (sceneNum >= tree.numSnapshots())
 			{
-				highScore2 = score;
-				
-				if (score > highScore)
-				{
-					System.out.println("New high score!");
-				}
-				
-				saveTree2();
+				sceneNum--;
 			}
-			else
-			{
-				break;
-			}
-		}
-		
-		tree3 = new NewMutatingDecisionTree(validStates);
-		controller3 = new DecisionTreeController(tree2.getRoot());
-		
-		while (true)
-		{
-			tree.mutate(addressesAndValues);
-			previous = addressesAndValues;
+			workOnScene(sceneNum);
+			
+			//play all
+			numControllerRequests *= 2;
 			setup();
 			load("contra.nes");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
-			controller.setTree(tree.getRoot());
+			controller.setTree(tree);
+			tree.setRunAllMode();
+			tree.reset();
 			run();
 			
 			while (!done) {}
 			
 			printResults();
 			System.out.println("Score of " + score);
-			
-			previous = addressesAndValues;
-			addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+			numControllerRequests = usedControllerRequests;
 	
 			teardown();
-			if (score > highScore && confirm(1))
+			saveTree();
+			if (score > highScore)
 			{
 				highScore = score;
 				System.out.println("New high score!");
-				saveTree();
-				numControllerRequests = usedControllerRequests * 3;
-				
-				tree.persist();
 			}
-			else if (score == highScore)
+			
+			++sceneNum;
+		}
+	}
+	
+	private void workOnScene(int sceneNum)
+	{
+		long highScore = 0;
+		int numControllerRequests = 7500;
+		while (true)
+		{
+			setupSnapshot(tree.getSnapshotForScene(sceneNum), numControllerRequests);
+			makeModifications();
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunSceneMode(sceneNum);
+			restart();
+			
+			while (!done) {}
+			
+			printResults();
+			System.out.println("Score of " + score);
+			
+			HashSet<Integer> addressesAndValues = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
+	
+			teardown();
+			if (score > highScore && confirm(sceneNum, numControllerRequests, highScore))
 			{
-				saveTree();
+				highScore = score;
+				System.out.println("New high score!");
 				tree.persist();
+				saveTree();
+				
+				if (timedOut())
+				{
+					System.out.println("Timed out");
+					numControllerRequests *= 3;
+					continue;
+				}
+				else if (completedScene())
+				{
+					System.out.println("Completed scene");
+					return;
+				}
+				else if (died())
+				{
+					System.out.println("Died");
+				}
+				else
+				{
+					System.out.println("No clue what happened");
+				}
+			} else if (score == highScore)
+			{
+				tree.persist();
+				saveTree();
+				
+				if (timedOut())
+				{
+					System.out.println("Timed out");
+				}
+				else if (completedScene())
+				{
+					System.out.println("Completed scene");
+					return;
+				}
+				else if (died())
+				{
+					System.out.println("Died");
+				}
+				else
+				{
+					System.out.println("No clue what happened");
+				}
 			}
 			else
 			{
 				tree.revert();
-				saveTree();
-				addressesAndValues = previous;
 			}
 			
-			tree2.mutate(addressesAndValues2);
-			previous2 = addressesAndValues2;
-			setup2();
-			load("contra.nes");
-			makeModifications();
-			controller2.reset();
-			controller2.setCpuMem(cpuMem);
-			controller2.setTree(tree2.getRoot());
-			run();
-			
-			while (!done) {}
-			
-			System.out.println("Score of " + score);
-			
-			previous2 = addressesAndValues2;
-			addressesAndValues2 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
-	
-			teardown();
-			if (score > highScore2 && confirm(2))
-			{
-				if (score > highScore)
-				{
-					System.out.println("New high score!");
-					highScore2 = highScore;
-					highScore = score;
-					HashSet<Integer> aav = addressesAndValues;
-					addressesAndValues = addressesAndValues2;
-					addressesAndValues2 = aav;
-					tree3.setRoot(tree2.getRoot().clone());
-					tree2.setRoot(tree.getRoot().clone());
-					tree.setRoot(tree3.getRoot().clone());
-					tree3.resetRoot();
-					tree.reindexTree();
-					tree2.reindexTree();
-					saveTree();
-					saveTree2();
-					long temp = numControllerRequests;
-					numControllerRequests = usedControllerRequests * 3;
-					numControllerRequests2 = temp;
-				}
-				else
-				{
-					highScore2 = score;
-					saveTree2();
-					numControllerRequests2 = usedControllerRequests * 3;				
-					tree2.persist();
-				}
-			}
-			else if (score == highScore2)
-			{
-				if (score > highScore)
-				{
-					highScore2 = highScore;
-					highScore = score;
-					HashSet<Integer> aav = addressesAndValues;
-					addressesAndValues = addressesAndValues2;
-					addressesAndValues2 = aav;
-					tree3.setRoot(tree2.getRoot().clone());
-					tree2.setRoot(tree.getRoot().clone());
-					tree.setRoot(tree3.getRoot().clone());
-					tree3.resetRoot();
-					tree.reindexTree();
-					tree2.reindexTree();
-					saveTree();
-					saveTree2();
-					long temp = numControllerRequests;
-					numControllerRequests = usedControllerRequests * 3;
-					numControllerRequests2 = temp;
-				}
-				else
-				{
-					saveTree2();
-					tree2.persist();
-				}
-			}
-			else
-			{
-				tree2.revert();
-				saveTree2();
-				addressesAndValues2 = previous2;
-			}
-			
-			tree3.setRoot(tree.merge(tree2, addressesAndValues, addressesAndValues2));
-			tree3.reindexTree();
-			setup3();
-			load("contra.nes");
-			makeModifications();
-			controller3.reset();
-			controller3.setCpuMem(cpuMem);
-			controller3.setTree(tree3.getRoot());
-			run();
-			
-			while (!done) {}
-			
-			System.out.println("Score of " + score);
-	
-			HashSet<Integer> addressesAndValues3 = ((Register4016)cpu.getMem().getLayout()[0x4016]).getTracking();
-			teardown();
-			if (score > highScore2 && score > highScore && confirm(3))
-			{
-				highScore = score;
-				highScore2 = -1;
-				addressesAndValues = addressesAndValues3;
-				System.out.println("New high score!");
-				tree.setRoot(tree3.getRoot().clone());
-				tree2.resetRoot();
-				tree3.resetRoot();
-				tree.reindexTree();
-				tree2.reindexTree();
-				numControllerRequests2 = 5000;
-				saveTree();
-				saveTree2();
-				numControllerRequests = usedControllerRequests * 3;
-			}
+			tree.mutate(addressesAndValues);
 		}
 	}
 	
-	private boolean confirm(int num)
+	private boolean died()
 	{
-		int NUM_CONFIRMS = 1;
-		long minFinalScore = score;
-		for (int i = 0; i < NUM_CONFIRMS; ++i)
+		return remainingLives < 3;
+	}
+	
+	private boolean timedOut()
+	{
+		if (!tree.foundNextKey() && remainingLives == 3)
 		{
-			if (num == 1)
-			{
-				setup();
-				load("contra.nes");
-				makeModifications();
-				controller.reset();
-				controller.setCpuMem(cpuMem);
-				controller.setTree(tree.getRoot());
-				run();
-				
-				while (!done) {}
-				
-				printResults();
-				System.out.println("Score of " + score);
-		
-				teardown();
-				if (!(score > highScore))
-				{
-					return false;
-				}
-			} else if (num == 2)
-			{
-				setup2();
-				load("contra.nes");
-				makeModifications();
-				controller2.reset();
-				controller2.setCpuMem(cpuMem);
-				controller2.setTree(tree2.getRoot());
-				run();
-				
-				while (!done) {}
-				
-				printResults();
-				System.out.println("Score of " + score);
-		
-				teardown();
-				if (!(score > highScore2))
-				{
-					return false;
-				}
-			}
-			else
-			{
-				setup3();
-				load("contra.nes");
-				makeModifications();
-				controller3.reset();
-				controller3.setCpuMem(cpuMem);
-				controller3.setTree(tree3.getRoot());
-				run();
-				
-				while (!done) {}
-				
-				printResults();
-				System.out.println("Score of " + score);
-		
-				teardown();
-				if (!(score > highScore && score > highScore2))
-				{
-					return false;
-				}
-			}
-			
-			if (score < minFinalScore)
-			{
-				minFinalScore = score;
-			}
+			return true;
 		}
 		
-		score = minFinalScore;
-		return true;
+		return false;
+	}
+	
+	private boolean completedScene()
+	{
+		return tree.foundNextKey();
+	}
+	
+	private boolean confirm(int sceneNum, int numControllerRequests, long highScore)
+	{
+		setupSnapshot(tree.getSnapshotForScene(sceneNum), numControllerRequests);
+		makeModifications();
+		controller.reset();
+		controller.setCpuMem(cpuMem);
+		controller.setTree(tree);
+		tree.setRunSceneMode(sceneNum);
+		restart();
+		
+		while (!done) {}
+		
+		printResults();
+		System.out.println("Score of " + score);
+
+		teardown();
+		return (score >= highScore);
 	}
 	
 	private boolean loadTree()
 	{
 		try
 		{
-			File file = new File("contra.tree");
+			File file = new File("contra_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -490,8 +341,8 @@ public class ContraDecisionTree implements AiAgent {
 			FileInputStream f = new FileInputStream(file);
 			ObjectInputStream i = new ObjectInputStream(f);
 	
-			tree = (NewMutatingDecisionTree)i.readObject();
-			controller = new DecisionTreeController(tree.getRoot());
+			tree = (MultiDecisionTree)i.readObject();
+			tree.makeWhole();
 	
 			i.close();
 			f.close();
@@ -508,7 +359,7 @@ public class ContraDecisionTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("contra.tree");
+			File file = new File("contra_scenes.tree");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -524,67 +375,21 @@ public class ContraDecisionTree implements AiAgent {
 		return true;
 	}
 	
-	private boolean loadTree2()
-	{
-		try
-		{
-			File file = new File("contra.tree2");
-			if (!file.exists())
-			{
-				return false;
-			}
-			
-			FileInputStream f = new FileInputStream(file);
-			ObjectInputStream i = new ObjectInputStream(f);
-	
-			tree2 = (NewMutatingDecisionTree)i.readObject();
-			controller2 = new DecisionTreeController(tree2.getRoot());
-	
-			i.close();
-			f.close();
-		}
-		catch(Exception e)
-		{
-			e.printStackTrace();
-		}
-		
-		return true;
-	}
-	
-	private boolean saveTree2()
-	{
-		try
-		{
-			File file = new File("contra.tree2");
-			FileOutputStream f = new FileOutputStream(file);
-			ObjectOutputStream o = new ObjectOutputStream(f);
-	
-			o.writeObject(tree2);
-			o.close();
-			f.close();
-		}
-		catch(Exception e)
-		{
-			e.printStackTrace();
-		}
-		
-		return true;
-	}
-	
 	private void setup()
 	{
 		score = 0;
+		possibleScoreIncrement = 0;
 		previousProgressCycle = 0;
 		previousProgressScore = 0;
-		remainingLives = 65536;
-		previousRemainingLives = 65536;
+		remainingLives = 3;
+		previousRemainingLives = 3;
 		previousProgressShots = 0;
 		done = false;
 		startedDone = false;
 		
 		clock = new Clock();
 		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
-		gui = new DecisionTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
+		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
@@ -604,64 +409,47 @@ public class ContraDecisionTree implements AiAgent {
 		gui.setClock(clock);
 	}
 	
-	private void setup2()
+	private void setupSnapshot(Snapshot snapshot, int requests)
 	{
 		score = 0;
+		possibleScoreIncrement = 0;
 		previousProgressCycle = 0;
 		previousProgressScore = 0;
-		remainingLives = 65536;
-		previousRemainingLives = 65536;
+		remainingLives = 3;
+		previousRemainingLives = 3;
 		previousProgressShots = 0;
 		done = false;
 		startedDone = false;
 		
-		clock = new Clock();
+		clock = snapshot.clock;
 		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
-		gui = new DecisionTreeGui(numControllerRequests2, firstUsableCycle, controller2, startOnOffTimes, clock);
-		guiThread = new Thread(gui);
-		guiThread.setPriority(10);
-		guiThread.start();
-		deaths.clear();
-		deaths = deaths;
-		
-		ppuMem = new Memory(Memory.PPU, null, gui);
-		ppu = new PPU(clock, ppuMem, gui);
-		cpuMem = new Memory(Memory.CPU, ppu, gui);
-		cpu = new CPU(clock, cpuMem, ppu, gui);
-		apu = new APU(cpu, gui, clock);
-		cpu.setApu(apu);
-		ppu.setCPU(cpu);
-		cpuMem.setCpu(cpu);
-		ppuMem.setCpu(cpu);
-		gui.setCpu(cpu);
+		controller = snapshot.controller;
+		gui = new MultiTreeGui(requests, firstUsableCycle, controller, startOnOffTimes, clock);
 		gui.setClock(clock);
-	}
-	
-	private void setup3()
-	{
-		score = 0;
-		previousProgressCycle = 0;
-		previousProgressScore = 0;
-		remainingLives = 65536;
-		previousRemainingLives = 65536;
-		previousProgressShots = 0;
-		done = false;
-		startedDone = false;
-		
-		clock = new Clock();
-		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
-		gui = new DecisionTreeGui(Math.max(numControllerRequests, numControllerRequests2), firstUsableCycle, controller3, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
 		deaths.clear();
 		deaths = deaths;
-		
-		ppuMem = new Memory(Memory.PPU, null, gui);
-		ppu = new PPU(clock, ppuMem, gui);
-		cpuMem = new Memory(Memory.CPU, ppu, gui);
-		cpu = new CPU(clock, cpuMem, ppu, gui);
-		apu = new APU(cpu, gui, clock);
+
+		ppuMem = snapshot.ppuMem;
+		ppuMem.setGui(gui);
+		ppu = snapshot.ppu;
+		ppu.setClock(clock);
+		ppu.setMem(ppuMem);
+		ppu.setGui(gui);
+		cpuMem = snapshot.cpuMem;
+		cpuMem.setPpu(ppu);
+		cpuMem.setGui(gui);
+		cpu = snapshot.cpu;
+		cpu.setClock(clock);
+		cpu.setMem(cpuMem);
+		cpu.setPpu(ppu);
+		cpu.setGui(gui);
+		apu = snapshot.apu;
+		apu.setCpu(cpu);
+		apu.setGui(gui);
+		apu.setClock(clock);
 		cpu.setApu(apu);
 		ppu.setCPU(cpu);
 		cpuMem.setCpu(cpu);
@@ -717,6 +505,14 @@ public class ContraDecisionTree implements AiAgent {
 		cpuThread.start();
 	}
 	
+	private void restart()
+	{
+		ppu.setRestart();
+		cpu.setRestart();
+		apu.setRestart();
+		run();
+	}
+	
 	private void printResults()
 	{
 		System.out.println("Game completions = " + cpu.getMem().read(0x31));
@@ -737,6 +533,8 @@ public class ContraDecisionTree implements AiAgent {
 		cpu.getMem().getLayout()[0x64] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x65], false, true, this, clock); //Screen number in level
 		cpu.getMem().getLayout()[0x30] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x64], false, true, this, clock); //Level
 		cpu.getMem().getLayout()[0xb4] = new DeathPort((byte)1, this, clock); //Detect a death
+		cpu.getMem().getLayout()[0x4016] = new Register4016(gui, cpu);
+		cpu.getMem().getLayout()[0x4017] = new Register4017(gui, (Register4016)cpu.getMem().getLayout()[0x4016], cpu);
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -745,33 +543,43 @@ public class ContraDecisionTree implements AiAgent {
 		if (!startedDone && !done)
 		{
 			startedDone = true;
-			score += possibleScoreIncrement;
 			done = true;
-			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
+			if (possibleScoreIncrement != 0)
+			{
+				score += possibleScoreIncrement;
+			}
+			else
+			{
+				long scoreDelta = getGameScore() - previousProgressScore;
+				long offset = getScreenOffset();
+				offset *= (256 * 256);
+				scoreDelta *= 256;
+				
+				score += (offset + scoreDelta);
+			}
+			
+			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
 		}
 	}
 	
 	public synchronized void setDeath(long cycle)
 	{
 		pause();
+		int lives = cpu.getMem().getLayout()[0x32].read(); 
+		
 		deaths.add(cycle);
 		deaths = deaths;
 		
 		--remainingLives;
-		cont();
-		if (remainingLives == 0)
-		{
-			setDone(clock.getPpuExpectedCycle());
-		}
 		
 		long scoreDelta = getGameScore() - previousProgressScore;
-		System.out.println("There were " + deaths.size() + " deaths");
 		
 		long offset = getScreenOffset();
 		offset *= (256 * 256);
 		scoreDelta *= 256;
 		
 		possibleScoreIncrement = (offset + scoreDelta);
+		setDone(clock.getPpuExpectedCycle());
 	}
 	
 	private void pause()
@@ -858,5 +666,50 @@ public class ContraDecisionTree implements AiAgent {
 	private long getTotalShots()
 	{
 		return gui.getTotalBPresses();
+	}
+	
+	public Snapshot snapshot()
+	{
+		Snapshot retval = new Snapshot();
+		
+		ppu.sync1();
+		while (!ppu.sync2()) {}
+		
+		apu.sync1();
+		while (!apu.sync2()) {}
+		
+		ppu.sync();
+		apu.sync();
+
+	    try {
+	    	ByteArrayOutputStream bos = new ByteArrayOutputStream();
+	    	ObjectOutputStream out = new ObjectOutputStream(bos);
+	        out.writeObject(ppu);
+	        out.writeObject(cpu);
+	        out.writeObject(apu);
+	        out.writeObject(controller);
+	        out.flush();
+	        out.close();
+	        byte[] bytes = bos.toByteArray();
+	        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+	        
+	        ppu.release();
+	        apu.release();
+
+	        ObjectInputStream in = new ObjectInputStream(bis);
+            retval.ppu = (PPU)in.readObject();
+            retval.cpu = (CPU)in.readObject();
+            retval.apu = (APU)in.readObject();
+            retval.controller = (MultiTreeController)in.readObject();
+            retval.clock = cpu.getClock();
+            retval.cpuMem = cpu.getMem();
+            retval.ppuMem = ppu.getMem();
+            bis.close();
+	    } catch (Exception e) {
+	        e.printStackTrace();
+	        System.exit(-1);
+	    }
+		
+		return retval;
 	}
 }

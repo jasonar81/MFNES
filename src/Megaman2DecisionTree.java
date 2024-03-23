@@ -144,6 +144,13 @@ public class Megaman2DecisionTree implements AiAgent {
 		if (!loadTree2())
 		{
 			tree2 = new NewMutatingDecisionTree(validStates);
+			
+			IfElseNode root = tree.getRoot();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			tree.setRoot(root);
+			tree.reindexTree();
+			
 			controller2 = new DecisionTreeController(tree2.getRoot());
 		}
 		
@@ -368,7 +375,8 @@ public class Megaman2DecisionTree implements AiAgent {
 	
 	private boolean confirm(int num)
 	{
-		int NUM_CONFIRMS = 1;
+		int NUM_CONFIRMS = 2;
+		long minFinalScore = score;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -430,8 +438,14 @@ public class Megaman2DecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (score < minFinalScore)
+			{
+				minFinalScore = score;
+			}
 		}
 		
+		score = minFinalScore;
 		return true;
 	}
 	
@@ -742,7 +756,9 @@ public class Megaman2DecisionTree implements AiAgent {
 	private long getScoreAtDeath()
 	{
 		long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x20].read());
-		long offset = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x1f].read());
+		long xPos = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x460].read());
+		long yPos = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x4a0].read());
+		long level = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x2a].read());
 		long bossHp = cpu.getMem().getLayout()[0x6c1].read();
 		long bossDamage = 0;
 		if (bossHp != 0)
@@ -755,6 +771,34 @@ public class Megaman2DecisionTree implements AiAgent {
 			bossDamage = 0;
 		}
 		
-		return (screen << 16) + (bossDamage << 8) + offset;
+		long offset = 0;
+		
+		if (level == 2)
+		{
+			if (screen == 5 || screen == 10 || screen == 16 || screen == 18)
+			{
+				offset = 256 - xPos;
+			}
+			else
+			{
+				offset = xPos;
+			}
+			
+			if (screen == 9 || screen == 10 || screen == 11)
+			{
+				offset += (256 - yPos);
+			}
+			else if (screen == 4 || screen == 5 || screen == 15 || screen == 16 || screen == 17 ||
+					screen == 18 || screen == 19)
+			{
+				offset += yPos;
+			}
+		}
+		else
+		{
+			offset = xPos;
+		}
+		
+		return (screen << 17) + (bossDamage << 9) + offset;
 	}
 }

@@ -5,8 +5,8 @@
 public class SaveAndUpdateMaxValuePort implements MemoryPort, ClearablePort {
 	private byte val;
 	private volatile byte maxValue = 0;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	
 	public SaveAndUpdateMaxValuePort(AiAgent agent, Clock clock)
 	{

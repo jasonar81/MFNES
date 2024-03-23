@@ -31,6 +31,7 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 	private volatile boolean startedDone;
 	private volatile long score;
 	private volatile long livesLost;
+	private static HashSet<Integer> levels = new HashSet<Integer>();
 	
 	private static AdventureIsland3DecisionTree instance;
 	
@@ -88,6 +89,13 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 		if (!loadTree())
 		{
 			tree = new NewMutatingDecisionTree(validStates);
+			
+			IfElseNode root = tree.getRoot();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			tree.setRoot(root);
+			tree.reindexTree();
+			
 			controller = new DecisionTreeController(tree.getRoot());
 		}
 		
@@ -377,6 +385,7 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		double minFinalScore = finalScore;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -441,8 +450,14 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (finalScore < minFinalScore)
+			{
+				minFinalScore = finalScore;
+			}
 		}
 		
+		finalScore = minFinalScore;
 		return true;
 	}
 	
@@ -694,7 +709,7 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 			startedDone = true;
 			++livesLost;
 			score = gameScore();
-			finalScore = score;
+			finalScore = score * levels.size();
 			done = true;
 			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
@@ -718,6 +733,11 @@ public class AdventureIsland3DecisionTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
+			int world = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xd0].read());
+			int level = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xd1].read());
+			level += (world << 8);
+			levels.add(level);
+			
 			if (cpu.getMem().getLayout()[0x394].read() == 0)
 			{
 				setDone(cycle);

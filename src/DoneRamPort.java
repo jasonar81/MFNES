@@ -1,10 +1,13 @@
 //Used by AI to indicate completion of a run
+import java.io.Serializable;
 
-public class DoneRamPort implements MemoryPort {
+public class DoneRamPort implements MemoryPort, Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	private byte val;
 	private byte lookoutVal;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	
 	public DoneRamPort(byte lookoutVal, AiAgent agent, Clock clock)
 	{

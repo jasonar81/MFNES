@@ -5,7 +5,8 @@ import java.io.Serializable;
 import java.util.Objects;
 
 public class IfElseNode implements Serializable {
-	private static final long serialVersionUID = 6635695383037681711L;
+private static final long serialVersionUID = -6732487624928621347L;
+
 	int address;
 	int checkValue;
 	boolean terminal;
@@ -91,6 +92,50 @@ public class IfElseNode implements Serializable {
 				return left.run(row);
 			}
 		}
+		else if (comparisonType == 9)
+		{
+			if (Byte.toUnsignedInt((byte)row[address]) == checkValue)
+			{
+				++leftCount;
+				return left.run(row);
+			}
+		}
+		else if (comparisonType == 10)
+		{
+			if (Byte.toUnsignedInt((byte)row[address]) >= checkValue)
+			{
+				++leftCount;
+				return left.run(row);
+			}
+		} else if (comparisonType == 11)
+		{
+			if (Byte.toUnsignedInt((byte)row[address]) <= checkValue)
+			{
+				++leftCount;
+				return left.run(row);
+			}
+		} else if (comparisonType == 12)
+		{
+			if (Byte.toUnsignedInt((byte)row[address]) == Byte.toUnsignedInt((byte)row[address2]))
+			{
+				++leftCount;
+				return left.run(row);
+			}
+		} else if (comparisonType == 13)
+		{
+			if (Byte.toUnsignedInt((byte)row[address]) >= Byte.toUnsignedInt((byte)row[address2]))
+			{
+				++leftCount;
+				return left.run(row);
+			}
+		} else if (comparisonType == 14)
+		{
+			if (Byte.toUnsignedInt((byte)row[address]) <= Byte.toUnsignedInt((byte)row[address2]))
+			{
+				++leftCount;
+				return left.run(row);
+			}
+		} 
 		
 		++rightCount;
 		return right.run(row);
@@ -143,11 +188,11 @@ public class IfElseNode implements Serializable {
 		else
 		{
 			retval = Objects.hash(address, terminal, left, right, comparisonType);
-			if (comparisonType <= 2)
+			if (comparisonType <= 2 || (comparisonType >= 9 && comparisonType <= 11))
 			{
 				retval = Objects.hash(retval, checkValue);
 			}
-			else if (comparisonType <= 5)
+			else if (comparisonType <= 5 || (comparisonType >= 9))
 			{
 				retval = Objects.hash(retval, address2);
 			} else 
@@ -183,10 +228,10 @@ public class IfElseNode implements Serializable {
 			return false;
 		}
 		
-		if (comparisonType <= 2)
+		if (comparisonType <= 2 || (comparisonType >= 9 && comparisonType <= 11))
 		{
 			return checkValue == r.checkValue;
-		} else if (comparisonType <= 5)
+		} else if (comparisonType <= 5 || comparisonType >= 9)
 		{
 			return address2 == r.address2;
 		}

@@ -2,8 +2,8 @@
 
 public class NonZeroDoneRamPort implements MemoryPort {
 	private byte val;
-	private AiAgent agent;
-	private Clock clock;
+	private transient AiAgent agent;
+	private transient Clock clock;
 	
 	public NonZeroDoneRamPort(AiAgent agent, Clock clock)
 	{

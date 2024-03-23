@@ -31,6 +31,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 	private volatile boolean startedDone;
 	private volatile long score;
 	private volatile long livesLost;
+	private static HashSet<Integer> levels = new HashSet<Integer>();
 	
 	private static AdventureIsland2DecisionTree instance;
 	
@@ -82,6 +83,13 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		if (!loadTree())
 		{
 			tree = new NewMutatingDecisionTree(validStates);
+			
+			IfElseNode root = tree.getRoot();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			tree.setRoot(root);
+			tree.reindexTree();
+			
 			controller = new DecisionTreeController(tree.getRoot());
 		}
 		
@@ -372,6 +380,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		double minFinalScore = finalScore;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -436,8 +445,14 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (finalScore < minFinalScore)
+			{
+				minFinalScore = finalScore;
+			}
 		}
 		
+		finalScore = minFinalScore;
 		return true;
 	}
 	
@@ -741,6 +756,8 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		Clock.periodNanos = 1.0;
 		cpu.getMem().getLayout()[0x7d2] = new NotifyChangesPort(this, clock); //Lives remaining
 		cpu.getMem().getLayout()[0x76] = new NotifyChangesPort(this, clock); //dying status
+		cpu.getMem().getLayout()[0xd0] = new NotifyChangesPort(this, clock); //world
+		cpu.getMem().getLayout()[0xd1] = new NotifyChangesPort(this, clock); //level
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -751,7 +768,7 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 			pause();
 			startedDone = true;
 			score = gameScore();
-			finalScore = score;
+			finalScore = score * levels.size();
 			done = true;
 			usedControllerRequests = ((DecisionTreeGui)gui).getRequests();
 		}
@@ -775,6 +792,11 @@ public class AdventureIsland2DecisionTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
+			int world = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xd0].read());
+			int level = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xd1].read());
+			level += (world << 8);
+			levels.add(level);
+			
 			if (cpu.getMem().getLayout()[0x76].read() == 1)
 			{
 				++livesLost;

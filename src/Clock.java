@@ -3,10 +3,14 @@
 //It can run multiple cycles at once if it is behind
 //The CPU and PPU never wait for the APU
 //Whereas they both make sure they never get too far ahead of each other
+import java.io.Serializable;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class Clock {
+public class Clock implements Serializable {
+private static final long serialVersionUID = -6732487624928621347L;
+
 	public static double periodNanos = 1000000000.0 / 5369317.5;
-	private long start;
+	private volatile long start;
 	private volatile long ppuExpected = 0;
 	private volatile long cpuExpected = 0;
 	
@@ -38,5 +42,10 @@ public class Clock {
 	public long getCpuExpectedCycle()
 	{
 		return cpuExpected;
+	}
+	
+	public void sync1()
+	{
+		
 	}
 }

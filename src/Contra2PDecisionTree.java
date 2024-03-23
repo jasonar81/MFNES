@@ -402,6 +402,7 @@ public class Contra2PDecisionTree implements AiAgent {
 	private boolean confirm(int num)
 	{
 		int NUM_CONFIRMS = 1;
+		long minFinalScore = score;
 		for (int i = 0; i < NUM_CONFIRMS; ++i)
 		{
 			if (num == 1)
@@ -466,8 +467,14 @@ public class Contra2PDecisionTree implements AiAgent {
 					return false;
 				}
 			}
+			
+			if (score < minFinalScore)
+			{
+				minFinalScore = score;
+			}
 		}
 		
+		score = minFinalScore;
 		return true;
 	}
 	
@@ -849,14 +856,24 @@ public class Contra2PDecisionTree implements AiAgent {
 		{
 			//Count progress on beating level 1 boss that is not reflected in score
 			System.out.println("At level 1 boss");
-			int retvalBak = retval;
-			retval += (0x10 - cpu.getMem().read(0x583)) * 4;
-			retval += (0x10 - cpu.getMem().read(0x587)) * 4;
-			retval += (0x20 - cpu.getMem().read(0x585)) * 4;
-			
-			int hits = retval - retvalBak;
-			hits /= 4;
-			System.out.println("Hits on boss = " + hits);
+			int remainingHp = cpu.getMem().read(0x578) + 
+					cpu.getMem().read(0x579) +
+					cpu.getMem().read(0x57a) +
+					cpu.getMem().read(0x57b) +
+					cpu.getMem().read(0x57c) +
+					cpu.getMem().read(0x57d) +
+					cpu.getMem().read(0x57e) +
+					cpu.getMem().read(0x57f) +
+					cpu.getMem().read(0x580) +
+					cpu.getMem().read(0x581) +
+					cpu.getMem().read(0x582) +
+					cpu.getMem().read(0x583) +
+					cpu.getMem().read(0x584) +
+					cpu.getMem().read(0x585) +
+					cpu.getMem().read(0x586) +
+					cpu.getMem().read(0x587);
+			System.out.println("Remaining HP = " + remainingHp);
+			retval += (256 * 16) - remainingHp;
 		}
 		
 		return retval;
