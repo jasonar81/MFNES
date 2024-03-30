@@ -1,20 +1,18 @@
 import java.awt.event.KeyEvent;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
-public class ContraMultiTree implements AiAgent{
+public class Megaman2MultiTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -22,26 +20,26 @@ public class ContraMultiTree implements AiAgent{
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
+	
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
 	private volatile boolean done;
 	private volatile boolean startedDone;
-	private volatile ArrayList<Long> deaths = new ArrayList<Long>();
 	private volatile long score;
-	private volatile long possibleScoreIncrement;
 	
-	private static ContraMultiTree instance;
+	private static Megaman2MultiTree instance;
 	
-	private long firstUsableCycle = 62407559;
-	private volatile long previousProgressCycle;
-	private volatile long previousProgressScore;
-	private volatile long remainingLives;
-	private volatile long previousRemainingLives;
-	private volatile long previousProgressShots;
+	private long firstUsableCycle = 41020224;
 	private MultiDecisionTree tree;
 	private MultiTreeController controller;
-	private long numControllerRequests = 7500;
+	private long numControllerRequests = 5000;
+	
+	private int previousLives = 0;
+	private int previousBossHp = 0;
+	private int previousScreen = 0;
+	private int previousLevel = 0;
+	
 	private long usedControllerRequests;
 	
 	private static int A = 0x80;
@@ -57,7 +55,7 @@ public class ContraMultiTree implements AiAgent{
 	
 	public static void main(String[] args)
 	{
-		instance = new ContraMultiTree();	
+		instance = new Megaman2MultiTree();
 		instance.main();
 	}
 	
@@ -84,31 +82,15 @@ public class ContraMultiTree implements AiAgent{
 		validStates.add(A);
 		validStates.add(B);
 		validStates.add(A | B);
-		
-		validStates.add(UP | LEFT);
-		validStates.add(UP | LEFT | A);
-		validStates.add(UP | LEFT | B);
-		validStates.add(UP | LEFT | A | B);
-		validStates.add(UP | RIGHT);
-		validStates.add(UP | RIGHT | A);
-		validStates.add(UP | RIGHT | B);
-		validStates.add(UP | RIGHT | A | B);
-		validStates.add(DOWN | LEFT);
-		validStates.add(DOWN | LEFT | A);
-		validStates.add(DOWN | LEFT | B);
-		validStates.add(DOWN | LEFT | A | B);
-		validStates.add(DOWN | RIGHT);
-		validStates.add(DOWN | RIGHT | A);
-		validStates.add(DOWN | RIGHT | B);
-		validStates.add(DOWN | RIGHT | A | B);
+		validStates.add(START);
 		
 		if (!loadTree())
 		{
 			ArrayList<Integer> addresses = new ArrayList<Integer>();
-			addresses.add(0x30);
-			addresses.add(0x64);
+			addresses.add(0x20);
+			addresses.add(0x2a);
 			ArrayList<Integer> disallow = new ArrayList<Integer>();
-			disallow.add(0x32);
+			disallow.add(0xa8);
 			IfElseNode defaultTree = new IfElseNode();
 			defaultTree.terminal = true;
 			defaultTree.terminalValue = RIGHT;
@@ -118,7 +100,7 @@ public class ContraMultiTree implements AiAgent{
 		controller = new MultiTreeController(tree);
 		tree.setValidStates(validStates);
 		setup();
-		load("contra.nes");
+		load("megaman2.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -129,9 +111,7 @@ public class ContraMultiTree implements AiAgent{
 		
 		while (!done) {}
 		
-		printResults();
 		System.out.println("Score of " + score);
-
 		highScore = score;
 		System.out.println("New high score!");
 		
@@ -141,7 +121,7 @@ public class ContraMultiTree implements AiAgent{
 		{
 			numControllerRequests = usedControllerRequests * 3;
 			setup();
-			load("contra.nes");
+			load("megaman2.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -152,9 +132,8 @@ public class ContraMultiTree implements AiAgent{
 			
 			while (!done) {}
 			
-			printResults();
 			System.out.println("Score of " + score);
-	
+			
 			teardown();
 			if (score > highScore)
 			{
@@ -192,7 +171,7 @@ public class ContraMultiTree implements AiAgent{
 			//play all
 			numControllerRequests *= 2;
 			setup();
-			load("contra.nes");
+			load("megaman2.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -203,7 +182,6 @@ public class ContraMultiTree implements AiAgent{
 			
 			while (!done) {}
 			
-			printResults();
 			System.out.println("Score of " + score);
 			numControllerRequests = usedControllerRequests * 3;
 	
@@ -219,7 +197,7 @@ public class ContraMultiTree implements AiAgent{
 		while (true)
 		{
 			setup();
-			load("contra.nes");
+			load("megaman2.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -230,7 +208,6 @@ public class ContraMultiTree implements AiAgent{
 			
 			while (!done) {}
 			
-			printResults();
 			System.out.println("Score of " + score);
 			
 			HashSet<Integer> addressesAndValues = tree.getAddressesAndValues();
@@ -250,7 +227,7 @@ public class ContraMultiTree implements AiAgent{
 				tree.persist();
 				saveTree();
 			}
-			else 
+			else
 			{
 				countWithNoImprovement++;
 				tree.revert();
@@ -280,7 +257,7 @@ public class ContraMultiTree implements AiAgent{
 	{
 		long minHighScore = score;
 		setup();
-		load("contra.nes");
+		load("megaman2.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -291,7 +268,6 @@ public class ContraMultiTree implements AiAgent{
 		
 		while (!done) {}
 		
-		printResults();
 		System.out.println("Score of " + score);
 		
 		if (score < minHighScore)
@@ -309,7 +285,7 @@ public class ContraMultiTree implements AiAgent{
 	{
 		try
 		{
-			File file = new File("contra_scenes.tree");
+			File file = new File("megaman2_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -336,7 +312,7 @@ public class ContraMultiTree implements AiAgent{
 	{
 		try
 		{
-			File file = new File("contra_scenes.tree");
+			File file = new File("megaman2_scenes.tree");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -354,24 +330,23 @@ public class ContraMultiTree implements AiAgent{
 	
 	private void setup()
 	{
+		previousLives = 0;
+		previousBossHp = 0;
+		previousScreen = 0;
+		previousLevel = 0;
 		score = 0;
-		possibleScoreIncrement = 0;
-		previousProgressCycle = 0;
-		previousProgressScore = 0;
-		remainingLives = 3;
-		previousRemainingLives = 3;
-		previousProgressShots = 0;
 		done = false;
 		startedDone = false;
 		
 		clock = new Clock();
-		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
+		
+		long[] startOnOffTimes = new long[] {10890547, 11309846, 14062612, 14921603, 29152813, 30020223, 40020223, 41020223};
 		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
+		long[] rightTimes = new long[] {37020223, 38020223};
+		((MultiTreeGui)gui).setRightTimes(rightTimes);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
-		deaths.clear();
-		deaths = deaths;
 		
 		ppuMem = new Memory(Memory.PPU, null, gui);
 		ppu = new PPU(clock, ppuMem, gui);
@@ -388,7 +363,9 @@ public class ContraMultiTree implements AiAgent{
 	
 	private void teardown()
 	{
+		
 		cpu.terminate();
+		
 		gui.terminate();
 		
 		try
@@ -396,22 +373,15 @@ public class ContraMultiTree implements AiAgent{
 			Thread.sleep(1000);
 		}
 		catch(Exception e) {}
-		cpu = null;
-		ppu = null;
-		cpuMem = null;
-		ppuMem = null;
-		apu = null;
-		clock = null;
-		gui = null;
 	}
 
-	private void load(String filename)
+	private void load(String filename, String saveFilename)
 	{
 		Cartridge cart = Cartridge.loadCart(filename);
 		
 		if (cart != null)
 		{
-			cpu.setupCart(cart);
+			cpu.setupCart(cart, saveFilename);
 			ppu.setupCart(cart);
 		}
 	}
@@ -420,36 +390,32 @@ public class ContraMultiTree implements AiAgent{
 	{
 		on();
 		cpu.debugHold(false);
+		
 	}
 	
 	private void on()
 	{
+		
+		
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
+		
+		
 		cpu.debugHold(true);
+		
+		
+		
 		cpuThread.start();
-	}
-	
-	private void printResults()
-	{
-		System.out.println("Game completions = " + cpu.getMem().read(0x31));
-		System.out.println("Level = " + cpu.getMem().read(0x30));
-		System.out.println("Screen in level = " + ((SaveMaxValueAndClearElsewherePort)cpu.getMem().getLayout()[0x64]).getMaxValue());
-		System.out.println("Distance into screen = " + ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue());
-		System.out.println("Score = " + getGameScore());
 	}
 	
 	private void makeModifications()
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x34] = new RomMemoryPort((byte)0); //Fix the randomizer value
-		//cpu.getMem().getLayout()[0x32] = new RomMemoryPort((byte)63); //Always report back 63 lives remaining
-		cpu.getMem().getLayout()[0x3a] = new DoneRamPort((byte)2, this, clock); //When continues decrements to 2, call it a wrap
-		cpu.getMem().getLayout()[0x65] = new SaveMaxValuePort(); //Distance into current screen
-		cpu.getMem().getLayout()[0x64] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x65], false, true, this, clock); //Screen number in level
-		cpu.getMem().getLayout()[0x30] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x64], false, true, this, clock); //Level
-		cpu.getMem().getLayout()[0xb4] = new DeathPort((byte)1, this, clock); //Detect a death
+		cpu.getMem().getLayout()[0xa8] = new NotifyChangesPort(this, clock); //Detect a death
+		cpu.getMem().getLayout()[0x6c1] = new NotifyChangesPort(this, clock); //Boss HP
+		cpu.getMem().getLayout()[0x20] = new NotifyChangesPort(this, clock); //screen
+		cpu.getMem().getLayout()[0x2a] = new NotifyChangesPort(this, clock); //level
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -458,116 +424,116 @@ public class ContraMultiTree implements AiAgent{
 		if (!startedDone && !done)
 		{
 			startedDone = true;
+			score += getScore();
 			done = true;
-			if (possibleScoreIncrement != 0)
-			{
-				score += possibleScoreIncrement;
-			}
-			else
-			{
-				long scoreDelta = getGameScore() - previousProgressScore;
-				long offset = getScreenOffset();
-				offset *= (256 * 256 * 256);
-				scoreDelta += (256 - Byte.toUnsignedInt(cpu.getMem().getLayout()[0x31a].read()));
-				scoreDelta *= 256;
-				
-				score += (offset + scoreDelta);
-			}
-			
 			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
 		}
 	}
 	
 	public synchronized void setDeath(long cycle)
 	{
-		pause();
-		
-		deaths.add(cycle);
-		deaths = deaths;
-		
-		--remainingLives;
-		
-		long scoreDelta = getGameScore() - previousProgressScore;
-		
-		long offset = getScreenOffset();
-		
-		possibleScoreIncrement = ((offset << 32) + (scoreDelta << 8));
-		setDone(clock.getPpuExpectedCycle());
 
 	}
 	
 	private void pause()
 	{
 		cpu.debugHold(true);
+		
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
+		
 	}
 	
 	public synchronized void progress(long cycle)
 	{
-		long currentScore = getGameScore();
 		pause();
-		long timeScore = (long)(255.0 - ((cycle - previousProgressCycle) / 5369317.5));
-		System.out.println("Took " + ((cycle - previousProgressCycle) / 5369317.5) + " seconds");
-		if (timeScore < 0)
+		
+		int bossHp = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x6c1].read());
+		int lives = cpu.getMem().getLayout()[0xa8].read();
+		int screen = cpu.getMem().getLayout()[0x20].read();
+		int level = cpu.getMem().getLayout()[0x2a].read();
+		if (screen > previousScreen || level != previousLevel)
 		{
-			timeScore = 0;
+			score += getScore();
 		}
-	
-		long offset = 255;
-		long scoreDelta = currentScore;
-		System.out.println("Score " + scoreDelta + " points");
 		
+		if (previousBossHp != bossHp)
+		{
+			if (previousBossHp > 0 && bossHp <= 0)
+			{
+				//Defeated boss
+				score += 0xffffff;
+			}
+		}
 		
-		previousProgressCycle = cycle;
-		previousProgressScore = currentScore;
-		previousRemainingLives = remainingLives;
-		previousProgressShots = getTotalShots();
-		score += (timeScore + (offset << 32) + (scoreDelta << 8));
+		if (previousLives != 0)
+		{
+			//Died
+			if (lives == 2)
+			{
+				setDone(cycle);
+				return;
+			}
+		}
+		
+		previousBossHp = bossHp;
+		previousLives = lives;
+		previousScreen = screen;
+		previousLevel = level;
 		
 		cont();
 	}
 	
-	private int getGameScore()
+	private long getScore()
 	{
-		int retval = (cpu.getMem().read(0x07e3) << 8) + cpu.getMem().read(0x07e2);
-		if (cpu.getMem().read(0x30) == 0 && cpu.getMem().read(0x64) == 0x0c)
+		long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x20].read());
+		long xPos = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x460].read());
+		long yPos = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x4a0].read());
+		long level = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x2a].read());
+		long bossHp = cpu.getMem().getLayout()[0x6c1].read();
+		long myHp = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x6c0].read());
+		long bossDamage = 0;
+		if (bossHp != 0)
 		{
-			//Count progress on beating level 1 boss that is not reflected in score
-			System.out.println("At level 1 boss");
-			int remainingHp = cpu.getMem().read(0x578) + 
-					cpu.getMem().read(0x579) +
-					cpu.getMem().read(0x57a) +
-					cpu.getMem().read(0x57b) +
-					cpu.getMem().read(0x57c) +
-					cpu.getMem().read(0x57d) +
-					cpu.getMem().read(0x57e) +
-					cpu.getMem().read(0x57f) +
-					cpu.getMem().read(0x580) +
-					cpu.getMem().read(0x581) +
-					cpu.getMem().read(0x582) +
-					cpu.getMem().read(0x583) +
-					cpu.getMem().read(0x584) +
-					cpu.getMem().read(0x585) +
-					cpu.getMem().read(0x586) +
-					cpu.getMem().read(0x587);
-			System.out.println("Remaining HP = " + remainingHp);
-			retval += (256 * 16) - remainingHp;
+			bossDamage = 0x7f - bossHp;
 		}
 		
-		return retval;
-	}
-	
-	private long getScreenOffset()
-	{
-		return ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue();
-	}
-	
-	private long getTotalShots()
-	{
-		return gui.getTotalBPresses();
+		if (bossDamage < 0)
+		{
+			bossDamage = 0;
+		}
+		
+		long offset = 0;
+		
+		if (level == 2)
+		{
+			if (screen == 5 || screen == 10 || screen == 16 || screen == 18)
+			{
+				offset = 256 - xPos;
+			}
+			else
+			{
+				offset = xPos;
+			}
+			
+			if (screen == 9 || screen == 10 || screen == 11)
+			{
+				offset += (256 - yPos);
+			}
+			else if (screen == 4 || screen == 5 || screen == 15 || screen == 16 || screen == 17 ||
+					screen == 18 || screen == 19)
+			{
+				offset += yPos;
+			}
+		}
+		else
+		{
+			offset = xPos;
+		}
+		
+		return (screen << 25) + (bossDamage << 17) + (myHp << 8) + offset;
 	}
 }

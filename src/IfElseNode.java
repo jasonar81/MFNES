@@ -5,7 +5,7 @@ import java.io.Serializable;
 import java.util.Objects;
 
 public class IfElseNode implements Serializable {
-private static final long serialVersionUID = -6732487624928621347L;
+private static final long serialVersionUID = 6635695383037681711L;
 
 	int address;
 	int checkValue;

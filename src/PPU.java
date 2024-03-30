@@ -5,10 +5,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class PPU implements Runnable, Serializable  {
-	private Clock clock;
+public class PPU implements Serializable  {
 	private Memory mem;
-	
+	private Clock clock;
 	private volatile int ctrl;
 	private volatile int mask;
 	private AtomicInteger status;
@@ -19,7 +18,7 @@ public class PPU implements Runnable, Serializable  {
 	private volatile boolean oddFrameFlag;
 	private volatile boolean lowHighFlag;
 	private int frameScroll; //Fixes the vertical scroll at the start of the frame
-	private long frameStart;
+	long frameStart;
 	private CPU cpu;
 	private transient GUI gui;
 	private byte[] nameTableBytes = new byte[272];
@@ -38,15 +37,11 @@ public class PPU implements Runnable, Serializable  {
 	private boolean spriteZeroFlag = false;
 	private AtomicBoolean justReadVbl;
 	
-	private AtomicBoolean debugHold;
-	private AtomicBoolean terminate;
-	private AtomicBoolean reset;
-	private AtomicInteger stepFlag;
 	private AtomicBoolean pendingOamWrite;
 	private volatile byte pendingOamWriteValue;
 	private volatile int pendingOamWriteAddress;
 	
-	private long cycle;
+	long cycle;
 	private long overage = 0;
 	private int spriteIndex;
 	private volatile boolean rendering = false;
@@ -55,10 +50,6 @@ public class PPU implements Runnable, Serializable  {
 	private int[] colorLookup = new int[64];
 	private volatile int nametableSelect = -1;
 	private volatile int externallyReportedScanline;
-	private boolean restart = false;
-	
-	private transient AtomicBoolean syncRequested = new AtomicBoolean(false);
-	private transient AtomicBoolean syncGranted = new AtomicBoolean(false);
 	
 	public PPU(Clock clock, Memory mem, GUI gui)
 	{
@@ -67,10 +58,6 @@ public class PPU implements Runnable, Serializable  {
 		this.gui = gui;
 		status = new AtomicInteger(0);
 		oamaddr = new AtomicInteger(0);
-		debugHold = new AtomicBoolean(false);
-		terminate = new AtomicBoolean(false);
-		reset = new AtomicBoolean(false);
-		stepFlag = new AtomicInteger(0);
 		pendingOamWrite = new AtomicBoolean(false);
 		justReadVbl = new AtomicBoolean(false);
 		ctrl = 0;
@@ -148,26 +135,14 @@ public class PPU implements Runnable, Serializable  {
 		colorLookup[0x3f] = makeRGB(0, 0, 0);
 	}
 	
-	public void resetSync()
-	{
-		syncRequested = new AtomicBoolean(false);
-		syncGranted = new AtomicBoolean(false);
-	}
-	
-	public void setRestart()
-	{
-		restart = true;
-		resetSync();
-	}
-	
-	public void setClock(Clock clock)
-	{
-		this.clock = clock;
-	}
-	
 	public void setMem(Memory mem)
 	{
 		this.mem = mem;
+	}
+	
+	public GUI getGui()
+	{
+		return gui;
 	}
 	
 	public void setGui(GUI gui)
@@ -383,26 +358,6 @@ public class PPU implements Runnable, Serializable  {
 		}
 	}
 	
-	public void setReset()
-	{
-		reset.set(true);
-	}
-
-	public void debugHold(boolean val)
-	{
-		debugHold.set(val);
-	}
-	
-	public void terminate()
-	{
-		terminate.set(true);
-	}
-	
-	public void step(long val)
-	{
-		stepFlag.addAndGet((int)val);
-	}
-	
 	public void setupCart(Cartridge cart)
 	{
 		mem.setupCart(cart);
@@ -446,54 +401,12 @@ public class PPU implements Runnable, Serializable  {
 		}
 	}
 
-	@Override
 	public void run() {
-		if (!restart)
-		{
-			cycle = 0;
-			frameStart = cycle;
-		}
-		
-		while (true)
-		{
-			if (terminate.get())
-			{
-				return;
-			}
-			
-			while (debugHold.get()) 
-			{
-				if (stepFlag.get() > 0)
-				{
-					stepFlag.addAndGet(-1);
-					break;
-				}
-				
-				try
-				{
-					Thread.sleep(1);
-				}
-				catch(Exception e) {}
-				
-				if (terminate.get())
-				{
-					return;
-				}
-			}
-			
-			if (reset.get())
-			{
-				reset();
-				reset.set(false);
-			}
-			else
-			{
-				execute(cycle - frameStart);
-			}
-		}
+		execute(cycle - frameStart);
+		++cycle;
 	}
 	
-	private void reset()
+	public void reset()
 	{
 		mask = 0;
 		lowHighFlag = false;
@@ -593,7 +506,6 @@ public class PPU implements Runnable, Serializable  {
 		}
 		
 		justReadVbl.set(false);
-		incrementCycle();
 	}
 	
 	private void doScanline(long scanline, long tickInScanline, boolean visible)
@@ -1321,64 +1233,6 @@ public class PPU implements Runnable, Serializable  {
 		*/
 		
 		return retval;
-	}
-	
-	public void sync1()
-	{
-		syncRequested.set(true);
-	}
-	
-	public synchronized void sync()
-	{
-		if (syncRequested.get())
-		{
-			syncGranted.set(true);
-			syncRequested.set(false);
-		}
-	}
-	
-	public boolean sync2()
-	{
-		return syncGranted.get();
-	}
-	
-	public void release()
-	{
-		syncGranted.set(false);
-	}
-	
-	public void incrementCycle()
-	{
-		clock.setPpuExpectedCycle(++cycle);
-		long expected = clock.getCpuExpectedCycle();
-		while (expected < cycle - (cycle %3)) 
-		{
-			if (terminate.get())
-			{
-				return;
-			}
-			
-			if (syncRequested.get())
-			{
-				sync();
-				while (syncGranted.get()) {}
-			}
-			
-			expected = clock.getCpuExpectedCycle();
-		}
-		
-		if (overage > 0)
-		{
-			--overage;
-			return;
-		}
-		
-		long current = clock.cycle();
-		while (current < cycle) {
-			current = clock.cycle();
-		}
-		
-		overage += (current - cycle);
 	}
 	
 	private int getBgFillColor()

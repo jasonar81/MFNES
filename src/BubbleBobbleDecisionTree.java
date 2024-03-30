@@ -20,8 +20,6 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
-	private Thread ppuThread;
-	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
@@ -640,9 +638,7 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 	
 	private void teardown()
 	{
-		apu.terminate();
 		cpu.terminate();
-		ppu.terminate();
 		gui.terminate();
 		
 		try
@@ -667,7 +663,6 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private void printResults()
@@ -683,16 +678,9 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 	
 	private void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread (apu);
-		apuThread.setPriority(10);
 		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
 		cpuThread.start();
 	}
 	
@@ -723,13 +711,11 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 	private void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private boolean processScreenResults()
@@ -794,7 +780,6 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 		}
 		
 		seconds = 255 - seconds;
-		seconds <<= 24;
 		long lives = cpu.getMem().read(0x2e);
 		System.out.println("Remaining lives = " + lives);
 		lives <<= 32;
@@ -805,6 +790,8 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 		{
 			delta = 0;
 		}
+		
+		delta <<= 8;
 		
 		System.out.println("Score in this level = " + delta);
 		previousScore = gameScore;
@@ -825,6 +812,7 @@ public class BubbleBobbleDecisionTree implements AiAgent {
 			delta = 0;
 		}
 		
+		delta <<= 8;
 		System.out.println("Score in this level = " + delta);
 		return lives + seconds + delta;
 	}

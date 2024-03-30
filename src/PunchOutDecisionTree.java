@@ -20,8 +20,8 @@ public class PunchOutDecisionTree implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
-	private Thread ppuThread;
-	private Thread apuThread;
+	
+	
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
@@ -629,9 +629,9 @@ public class PunchOutDecisionTree implements AiAgent {
 	
 	private void teardown()
 	{
-		apu.terminate();
+		
 		cpu.terminate();
-		ppu.terminate();
+		
 		gui.terminate();
 		
 		try
@@ -656,7 +656,7 @@ public class PunchOutDecisionTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
+		
 	}
 	
 	private void printResults()
@@ -668,16 +668,16 @@ public class PunchOutDecisionTree implements AiAgent {
 	
 	private void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
+		
+		
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread (apu);
-		apuThread.setPriority(10);
+		
+		
 		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
+		
+		
+		
 		cpuThread.start();
 	}
 
@@ -723,13 +723,13 @@ public class PunchOutDecisionTree implements AiAgent {
 	private void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
+		
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
+		
 	}
 	
 	public synchronized void progress(long cycle)

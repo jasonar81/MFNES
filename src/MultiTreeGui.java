@@ -1,15 +1,17 @@
 //GUI implementation for neural net AIs
 
 import java.awt.event.KeyEvent;
+import java.io.Serializable;
 
-public class MultiTreeGui extends DefaultGUI {
+public class MultiTreeGui extends DefaultGUI implements Serializable {
+	private static final long serialVersionUID = -6732487624928621347L;
 	private long numControllerRequests;
 	private long firstUsableCycle;
 	private int state;
 	private long requests = 0;
-	private transient MultiTreeController controller;
+	private MultiTreeController controller;
 	private long[] startOnOffTimes;
-	private transient Clock clock;
+	private Clock clock;
 	private long[] selectTimes = new long[0];
 	private long[] rightTimes = new long[0];
 	private boolean previousBState = false;
@@ -21,6 +23,11 @@ public class MultiTreeGui extends DefaultGUI {
 		this.controller = controller;
 		this.startOnOffTimes = startOnOffTimes;
 		this.clock = clock;
+	}
+	
+	public MultiTreeController getController()
+	{
+		return controller;
 	}
 	
 	public void setController(MultiTreeController controller)

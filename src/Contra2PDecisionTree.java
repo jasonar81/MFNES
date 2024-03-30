@@ -20,8 +20,6 @@ public class Contra2PDecisionTree implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
-	private Thread ppuThread;
-	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
@@ -704,9 +702,7 @@ public class Contra2PDecisionTree implements AiAgent {
 	
 	private void teardown()
 	{
-		apu.terminate();
 		cpu.terminate();
-		ppu.terminate();
 		gui.terminate();
 		
 		try
@@ -731,21 +727,13 @@ public class Contra2PDecisionTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread(apu);
-		apuThread.setPriority(10);
 		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
 		cpuThread.start();
 	}
 	
@@ -792,32 +780,30 @@ public class Contra2PDecisionTree implements AiAgent {
 		deaths = deaths;
 		
 		--remainingLives;
-		cont();
-		if (remainingLives == 0)
-		{
-			setDone(clock.getPpuExpectedCycle());
-			return;
-		}
-		long scoreDelta = getGameScore() - previousProgressScore;
+		long scoreDelta = getGameScore();
 		System.out.println("There were " + deaths.size() + " deaths");
 		
 		long offset = getScreenOffset();
-		offset *= (256 * 256);
-		scoreDelta *= 256;
 		
-		possibleScoreIncrement = (offset + scoreDelta);
+		if (remainingLives == 0)
+		{
+			possibleScoreIncrement = ((offset << 32) + (scoreDelta << 8));
+			setDone(clock.getPpuExpectedCycle());
+			return;
+		}
+		
+		possibleScoreIncrement = 0;
+		cont();
 	}
 	
 	private void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	public synchronized void progress(long cycle)
@@ -826,24 +812,21 @@ public class Contra2PDecisionTree implements AiAgent {
 		pause();
 		long lives = 65536 - (previousRemainingLives - remainingLives);
 		System.out.println("Lives lost = " + (previousRemainingLives - remainingLives));
-		lives *= (256L * 256L * 256L * 256L);
 		long timeScore = (long)(255.0 - ((cycle - previousProgressCycle) / 5369317.5));
 		System.out.println("Took " + ((cycle - previousProgressCycle) / 5369317.5) + " seconds");
 		if (timeScore < 0)
 		{
 			timeScore = 0;
 		}
-		timeScore *= (256L * 256L * 256L);
+		
 		long offset = 255;
-		offset *= (256 * 256);
-		long scoreDelta = currentScore - previousProgressScore;
+		long scoreDelta = currentScore;
 		System.out.println("Score " + scoreDelta + " points");
-		scoreDelta *= 256;
 		
 		previousProgressCycle = cycle;
 		previousProgressScore = currentScore;
 		previousRemainingLives = remainingLives;
-		score += (lives + timeScore + offset + scoreDelta);
+		score += ((lives << 40) + timeScore + (offset << 32) + (scoreDelta << 8));
 		
 		cont();
 	}

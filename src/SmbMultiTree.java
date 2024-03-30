@@ -12,7 +12,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class GenSmbDtVideo implements AiAgent {
+public class SmbMultiTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -28,8 +28,10 @@ public class GenSmbDtVideo implements AiAgent {
 	private volatile boolean done;
 	private volatile boolean startedDone;
 	private volatile long score;
+	private volatile long previousScreen = 0;
+	private volatile long previousLevel = 0;
 	
-	private static GenSmbDtVideo instance;
+	private static SmbMultiTree instance;
 	
 	private long firstUsableCycle = 25377919; 
 	private volatile long previousTimer;
@@ -37,9 +39,11 @@ public class GenSmbDtVideo implements AiAgent {
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
 	
-	private NewMutatingDecisionTree tree;
-	private DecisionTreeController controller;
-	private long numControllerRequests = 10000000;
+	private MultiDecisionTree tree;
+	private MultiTreeController controller;
+	private long numControllerRequests = 5000;
+	
+	private long usedControllerRequests;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -50,20 +54,11 @@ public class GenSmbDtVideo implements AiAgent {
 	private static int SELECT = 0x02;
 	private static int START = 0x01;
 	
-	private static String dir;
-	private static String ts;
+	private int countWithNoImprovement = 0;
 	
 	public static void main(String[] args)
 	{
-		dir = args[0];
-		ts = args[1];
-		
-		if (!dir.endsWith("/"))
-		{
-			dir += "/";
-		}
-		
-		instance = new GenSmbDtVideo();
+		instance = new SmbMultiTree();
 		instance.main();
 	}
 	
@@ -93,29 +88,212 @@ public class GenSmbDtVideo implements AiAgent {
 		
 		if (!loadTree())
 		{
-			tree = new NewMutatingDecisionTree(validStates);
-			controller = new DecisionTreeController(tree.getRoot());
+			ArrayList<Integer> addresses = new ArrayList<Integer>();
+			addresses.add(0x71a);
+			addresses.add(0x75f);
+			addresses.add(0x760);
+			ArrayList<Integer> disallow = new ArrayList<Integer>();
+			IfElseNode defaultTree = new IfElseNode();
+			defaultTree.terminal = true;
+			defaultTree.terminalValue = RIGHT;
+			tree = new MultiDecisionTree(validStates, addresses, defaultTree, disallow);
 		}
 		
+		controller = new MultiTreeController(tree);
 		tree.setValidStates(validStates);
 		setup();
 		load("smb.nes");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
-		controller.setTree(tree.getRoot());
+		controller.setTree(tree);
+		tree.setRunAllMode();
+		tree.reset();
 		run();
 		
 		while (!done) {}
 		
+		printResults();
+		System.out.println("Score of " + score);
+
+		processScreenResults();
+		highScore = score;
+		System.out.println("New high score!");
+		
 		teardown();
+		
+		while (true)
+		{
+			numControllerRequests = usedControllerRequests * 3;
+			setup();
+			load("smb.nes");
+			makeModifications();
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunAllMode();
+			tree.reset();
+			run();
+			
+			while (!done) {}
+			
+			printResults();
+			System.out.println("Score of " + score);
+
+			processScreenResults();
+	
+			teardown();
+			if (score > highScore)
+			{
+				highScore = score;
+				System.out.println("New high score!");
+				saveTree();
+			}
+			else
+			{
+				break;
+			}
+		}
+		
+		int sceneNum = tree.getLastSceneNum();
+		countWithNoImprovement = tree.getLastNoImprovementCount();
+		while (true)
+		{
+			//play screen until no deaths 
+			System.out.println("Working on scene " + sceneNum);
+			while (sceneNum >= tree.numScenes())
+			{
+				sceneNum--;
+			}
+			
+			if (!workOnScene(sceneNum))
+			{
+				if (sceneNum > 0)
+				{
+					sceneNum--;
+				}
+				
+				continue;
+			}
+			
+			//play all
+			numControllerRequests *= 2;
+			setup();
+			load("smb.nes");
+			makeModifications();
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunAllMode();
+			tree.reset();
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+			numControllerRequests = usedControllerRequests * 3;
+	
+			teardown();
+			saveTree();
+			++sceneNum;
+		}
+	}
+	
+	private boolean workOnScene(int sceneNum)
+	{
+		countWithNoImprovement = 0;
+		while (true)
+		{
+			setup();
+			load("smb.nes");
+			makeModifications();
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunSceneMode(sceneNum, countWithNoImprovement);
+			tree.setRegister4016(((Register4016)cpu.getMem().getLayout()[0x4016]));
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+			
+			HashSet<Integer> addressesAndValues = tree.getAddressesAndValues();
+	
+			teardown();
+			
+			if (score > highScore && confirm(sceneNum))
+			{
+				countWithNoImprovement = 0;
+				highScore = score;
+				System.out.println("New high score with scene num = " + sceneNum);
+				tree.persist();
+				saveTree();
+			} else if (score == highScore)
+			{
+				countWithNoImprovement++;
+				tree.persist();
+				saveTree();
+			}
+			else 
+			{
+				countWithNoImprovement++;
+				tree.revert();
+			}
+			
+			if (countWithNoImprovement > 300)
+			{
+				return completedScene();
+			}
+			else
+			{
+				System.out.println("No improvement count: " + countWithNoImprovement);
+			}
+			
+			System.out.println("Addresses and values size = " + addressesAndValues.size());
+			System.out.println("Completed scene = " + completedScene());
+			tree.mutate(addressesAndValues);
+		}
+	}
+	
+	private boolean completedScene()
+	{
+		return tree.foundNextKey();
+	}
+	
+	private boolean confirm(int sceneNum)
+	{
+		long minHighScore = score;
+		setup();
+		load("smb.nes");
+		makeModifications();
+		controller.reset();
+		controller.setCpuMem(cpuMem);
+		controller.setTree(tree);
+		tree.setRunSceneMode(sceneNum);
+		tree.setRegister4016(((Register4016)cpu.getMem().getLayout()[0x4016]));
+		run();
+		
+		while (!done) {}
+		
+		System.out.println("Score of " + score);
+		
+		if (score < minHighScore)
+		{
+			minHighScore = score;
+		}
+
+		teardown();
+		
+		score = minHighScore;
+		return (score > highScore);
 	}
 	
 	private boolean loadTree()
 	{
 		try
 		{
-			File file = new File(dir + "smb" + ts + ".tree");
+			File file = new File("smb_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -124,8 +302,8 @@ public class GenSmbDtVideo implements AiAgent {
 			FileInputStream f = new FileInputStream(file);
 			ObjectInputStream i = new ObjectInputStream(f);
 	
-			tree = (NewMutatingDecisionTree)i.readObject();
-			controller = new DecisionTreeController(tree.getRoot());
+			tree = (MultiDecisionTree)i.readObject();
+			tree.makeWhole();
 	
 			i.close();
 			f.close();
@@ -138,8 +316,30 @@ public class GenSmbDtVideo implements AiAgent {
 		return true;
 	}
 	
+	private boolean saveTree()
+	{
+		try
+		{
+			File file = new File("smb_scenes.tree");
+			FileOutputStream f = new FileOutputStream(file);
+			ObjectOutputStream o = new ObjectOutputStream(f);
+	
+			o.writeObject(tree);
+			o.close();
+			f.close();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		return true;
+	}
+	
 	private void setup()
 	{
+		previousScreen = 0;
+		previousLevel = 0;
 		screenScores = new ArrayList<Long>();
 		score = 0;
 		previousTimer = 999;
@@ -149,7 +349,7 @@ public class GenSmbDtVideo implements AiAgent {
 		
 		long[] startOnOffTimes = new long[] {16103188, 16979809, 24542115, 25377918};
 		clock = new Clock();
-		gui = new RecordingDecisionTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock, dir + "smb_dt" + ts + ".mp4");
+		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
@@ -247,9 +447,8 @@ public class GenSmbDtVideo implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x0e] = new DoneRamPort((byte)6, this, clock); //Call it a wrap when there's a death
-		cpu.getMem().getLayout()[0x7fc] = new NonZeroDoneRamPort(this, clock); //I think this increments with game completions
 		cpu.getMem().getLayout()[0x71a] = new NotifyChangesPort(this, clock); //call progress when we get to a new screen
+		cpu.getMem().getLayout()[0x75a] = new NotifyChangesPort(this, clock); //when continues decrement 
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -268,6 +467,7 @@ public class GenSmbDtVideo implements AiAgent {
 			System.out.println("Screen scores size is " + screenScores.size());
 			System.out.println("Added " + partialScore + " to score");
 			done = true;
+			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
 		}
 	}
 	
@@ -298,12 +498,27 @@ public class GenSmbDtVideo implements AiAgent {
 	public synchronized void progress(long cycle)
 	{
 		pause();
-		long screenScore = finishedScreenScore(cycle);
-		score += screenScore;
-		screenScores.add(screenScore);
-		screenScores = screenScores;
-		System.out.println("Screen scores size is " + screenScores.size());
-		System.out.println("Added " + screenScore + " to score");
+		long screen = getScreenInLevel();
+		long level = getLevel();
+		
+		if (screen > previousScreen || level > previousLevel)
+		{
+			previousScreen = screen;
+			previousLevel = level;
+			
+			long screenScore = finishedScreenScore(cycle);
+			score += screenScore;
+			screenScores.add(screenScore);
+			screenScores = screenScores;
+			System.out.println("Screen scores size is " + screenScores.size());
+			System.out.println("Added " + screenScore + " to score");
+		}
+		else if (cpu.getMem().getLayout()[0x75a].read() == 1)
+		{
+			setDone(cycle);
+			return;
+		}
+		
 		cont();
 	}
 	

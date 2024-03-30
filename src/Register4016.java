@@ -22,6 +22,11 @@ public class Register4016 implements MemoryPort {
 		this.cpu = cpu;
 	}
 	
+	public void setGui(GUI gui)
+	{
+		this.gui = gui;
+	}
+	
 	public void enableTracking(long firstUsableCycle)
 	{
 		enableTracking = true;

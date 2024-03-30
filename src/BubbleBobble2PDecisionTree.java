@@ -20,8 +20,6 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
-	private Thread ppuThread;
-	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
@@ -669,9 +667,7 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 	
 	private void teardown()
 	{
-		apu.terminate();
 		cpu.terminate();
-		ppu.terminate();
 		gui.terminate();
 		
 		try
@@ -696,7 +692,6 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private void printResults()
@@ -712,16 +707,9 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 	
 	private void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread (apu);
-		apuThread.setPriority(10);
-		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
+		cpu.debugHold(true);;
 		cpuThread.start();
 	}
 	
@@ -753,13 +741,11 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 	private void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private boolean processScreenResults()
@@ -827,7 +813,6 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 		}
 		
 		seconds = 255 - seconds;
-		seconds <<= 24;
 		long lives = cpu.getMem().read(0x2e);
 		lives += cpu.getMem().read(0x42);
 		System.out.println("Remaining lives = " + lives);
@@ -840,6 +825,7 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 			delta = 0;
 		}
 		
+		delta <<= 8;
 		System.out.println("Score in this level = " + delta);
 		previousScore = gameScore;
 		previousFinishTime = cycle;
@@ -859,6 +845,7 @@ public class BubbleBobble2PDecisionTree implements AiAgent {
 			delta = 0;
 		}
 		
+		delta <<= 8;
 		System.out.println("Score in this level = " + delta);
 		return lives + seconds + delta;
 	}

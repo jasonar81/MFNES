@@ -18,46 +18,76 @@ private static final long serialVersionUID = -6732487624928621347L;
 	private transient IfElseNode backup;
 	private ArrayList<Integer> sceneAddresses;
 	private ArrayList<Integer> disallow;
-	private int defaultVal;
+	private IfElseNode defaultTree;
 	private transient boolean runAllMode;
 	private transient ArrayList<ArrayList<Integer>> sceneOrder;
-	private transient Snapshotable snapshotAgent;
-	private transient HashMap<ArrayList<Integer>, Snapshot> snapshots;
 	private transient int sceneNum;
-	private transient boolean foundNextKey;
+	private transient HashSet<ArrayList<Integer>> scenes;
+	private transient boolean trackingEnabled = false;
+	private transient Register4016 reg4016;
+	private transient HashSet<Integer> addressesAndValues;
+	private transient boolean foundNextKey = false;
+	private int lastSceneNum = 0;
+	private int lastNoImprovementCount = 0;
 	
-	public MultiDecisionTree(ArrayList<Integer> validStates, ArrayList<Integer> sceneAddresses, int defaultVal, ArrayList<Integer> disallow)
+	public MultiDecisionTree(ArrayList<Integer> validStates, ArrayList<Integer> sceneAddresses, IfElseNode defaultTree, ArrayList<Integer> disallow)
 	{
 		this.validStates = validStates;
 		roots = new HashMap<ArrayList<Integer>, IfElseNode>();
 		treeSizes = new HashMap<ArrayList<Integer>, Integer>();
 		this.sceneAddresses = sceneAddresses;
 		this.disallow = disallow;
-		this.defaultVal = defaultVal;
+		this.defaultTree = defaultTree;
 		sceneOrder = new ArrayList<ArrayList<Integer>>();
-		snapshots = new HashMap<ArrayList<Integer>, Snapshot>();
+		scenes = new HashSet<ArrayList<Integer>>();
+	}
+	
+	public int getLastSceneNum()
+	{
+		System.out.println("Last scene num is returning " + lastSceneNum);
+		return lastSceneNum;
+	}
+	
+	public int getLastNoImprovementCount()
+	{
+		return lastNoImprovementCount;
+	}
+	
+	public void setRegister4016(Register4016 r)
+	{
+		reg4016 = r;
 	}
 	
 	public void makeWhole()
 	{
 		sceneOrder = new ArrayList<ArrayList<Integer>>();
-		snapshots = new HashMap<ArrayList<Integer>, Snapshot>();
-	}
-	
-	public void setSnapshotAgent(Snapshotable snapshotAgent)
-	{
-		this.snapshotAgent = snapshotAgent;
-	}
-	
-	public boolean foundNextKey()
-	{
-		return foundNextKey;
+		scenes = new HashSet<ArrayList<Integer>>();
 	}
 	
 	public void setRunSceneMode(int sceneNum)
 	{
 		runAllMode = false;
 		this.sceneNum = sceneNum;
+		trackingEnabled = false;
+		foundNextKey = false;
+		addressesAndValues = null;
+		lastSceneNum = sceneNum;
+	}
+	
+	public void setRunSceneMode(int sceneNum, int noImprovementCount)
+	{
+		runAllMode = false;
+		this.sceneNum = sceneNum;
+		trackingEnabled = false;
+		foundNextKey = false;
+		addressesAndValues = null;
+		lastSceneNum = sceneNum;
+		lastNoImprovementCount = noImprovementCount;
+	}
+	
+	public boolean foundNextKey()
+	{
+		return foundNextKey;
 	}
 	
 	public void setRunAllMode()
@@ -111,9 +141,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 	
 	public void mutate(HashSet<Integer> addressesAndValues)
 	{
-		//Remove addresses that only have one value
-		cleanseAav(addressesAndValues);
-		
 		IfElseNode root = roots.get(sceneOrder.get(sceneNum));
 		int treeSize = recomputeTreeSize(root, 0);
 		treeSizes.put(sceneOrder.get(sceneNum), treeSize);
@@ -719,8 +746,11 @@ private static final long serialVersionUID = -6732487624928621347L;
 	
 	public void revert()
 	{
-		roots.put(sceneOrder.get(sceneNum), backup);
-		treeSizes.put(sceneOrder.get(sceneNum), recomputeTreeSize(backup, 0));
+		if (backup != null)
+		{
+			roots.put(sceneOrder.get(sceneNum), backup);
+			treeSizes.put(sceneOrder.get(sceneNum), recomputeTreeSize(backup, 0));
+		}
 	}
 	
 	public void persist()
@@ -915,7 +945,7 @@ private static final long serialVersionUID = -6732487624928621347L;
 	public void reset()
 	{
 		sceneOrder.clear();
-		snapshots.clear();
+		scenes.clear();
 	}
 
 	public int run(int[] allRam) {
@@ -929,68 +959,66 @@ private static final long serialVersionUID = -6732487624928621347L;
 			
 			if (!roots.containsKey(key))
 			{
-				IfElseNode root = new IfElseNode();
-				root.terminal = true;
-				root.terminalValue = defaultVal;
+				IfElseNode root = defaultTree.clone();
 				roots.put(key, root);
 				reindexTree(key);
 			}
 			
-			if (!snapshots.containsKey(key))
+			if (!scenes.contains(key))
 			{
 				sceneOrder.add(key);
-				snapshots.put(key, snapshotAgent.snapshot());
+				scenes.add(key);
+				System.out.println("Added to scenes!");
 			}
 			
 			return roots.get(key).run(allRam);
 		}
 		
-		foundNextKey = false;
 		ArrayList<Integer> key = new ArrayList<Integer>();
 		for (Integer address : sceneAddresses)
 		{
 			key.add(allRam[address]);
 		}
 		
-		if (!key.equals(sceneOrder.get(sceneNum)))
+		if (key.equals(sceneOrder.get(sceneNum)))
 		{
-			if (!sceneOrder.contains(key) || sceneOrder.indexOf(key) > sceneNum)
+			if (!trackingEnabled)
 			{
-				foundNextKey = true;
-				return -1;
+				reg4016.enableTracking(0);
+				trackingEnabled = true;
 			}
 		}
+		else if (trackingEnabled)
+		{
+			addressesAndValues = reg4016.getTracking();
+			reg4016.enableTracking(0);
+			trackingEnabled = false;
+			foundNextKey = true;
+		}
 		
-		return roots.get(sceneOrder.get(sceneNum)).run(allRam);
+		IfElseNode tree = roots.get(key);
+		if (tree == null)
+		{
+			tree = defaultTree.clone();
+			roots.put(key, tree);
+			reindexTree(key);
+		}
+		
+		return tree.run(allRam);
 	}
 	
-	public int numSnapshots()
+	public int numScenes()
 	{
 		return sceneOrder.size();
 	}
 	
-	public Snapshot getSnapshotForScene(int sceneNum)
+	public HashSet<Integer> getAddressesAndValues()
 	{
-		Snapshot snapshot = snapshots.get(sceneOrder.get(sceneNum));
-		Snapshot retval = null;
-
-	    try {
-	    	ByteArrayOutputStream bos = new ByteArrayOutputStream();
-	    	ObjectOutputStream out = new ObjectOutputStream(bos);
-	        out.writeObject(snapshot);
-	        out.flush();
-	        out.close();
-	        byte[] bytes = bos.toByteArray();
-	        ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
-
-	        ObjectInputStream in = new ObjectInputStream(bis);
-            retval = (Snapshot)in.readObject();
-            bis.close();
-	    } catch (Exception e) {
-	        e.printStackTrace();
-	        System.exit(-1);
-	    }
+		if (addressesAndValues == null)
+		{
+			addressesAndValues = reg4016.getTracking();
+		}
 		
-		return retval;
+		return addressesAndValues;
 	}
 }

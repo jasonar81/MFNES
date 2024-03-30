@@ -45,9 +45,9 @@ public class Record {
 		if (on)
 		{
 			on = false;
-			apu.terminate();
+			
 			cpu.terminate();
-			ppu.terminate();
+			
 			gui.terminate();
 			
 			try
@@ -62,7 +62,7 @@ public class Record {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
+		
 	}
 	
 	private static void on()
@@ -70,16 +70,16 @@ public class Record {
 		if (!on)
 		{
 			on = true;
-			ppuThread = new Thread(ppu);
-			ppuThread.setPriority(10);
+			
+			
 			cpuThread = new Thread(cpu);
 			cpuThread.setPriority(10);
-			apuThread = new Thread(apu);
-			apuThread.setPriority(10);
+			
+			
 			cpu.debugHold(true);
-			ppu.debugHold(true);
-			apuThread.start();
-			ppuThread.start();
+			
+			
+			
 			cpuThread.start();
 		}
 	}

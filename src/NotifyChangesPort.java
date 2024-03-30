@@ -3,7 +3,7 @@
 public class NotifyChangesPort implements MemoryPort {
 	private byte val;
 	private transient AiAgent agent;
-	private transient Clock clock;
+	private Clock clock;
 	private boolean hold = false;
 	
 	public NotifyChangesPort(AiAgent agent, Clock clock)
@@ -19,6 +19,11 @@ public class NotifyChangesPort implements MemoryPort {
 		this.agent = agent;
 		this.clock = clock;
 		hold = true;
+	}
+	
+	public void setAgent(AiAgent agent)
+	{
+		this.agent = agent;
 	}
 	
 	@Override

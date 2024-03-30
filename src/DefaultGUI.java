@@ -29,15 +29,15 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 
 public class DefaultGUI implements GUI, ComponentListener, KeyListener {
-	protected JFrame frame;
-	protected volatile BufferedImage img;
+	protected transient JFrame frame;
+	protected transient volatile BufferedImage img;
 	protected volatile int[] imgData = new int[280 * 240];
-	protected JPanel panel;
-	protected BufferStrategy strategy;
+	protected transient JPanel panel;
+	protected transient BufferStrategy strategy;
 	protected AtomicInteger width;
 	protected AtomicInteger height;
-	protected AtomicInteger x;
-	protected AtomicInteger y;
+	protected transient AtomicInteger x;
+	protected transient AtomicInteger y;
 	private Color black;
 	protected AtomicBoolean swap;
 	
@@ -58,7 +58,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	private long framesSent = 0;
 	
 	private CPU cpu;
-	private PrintWriter recordLog;
+	private transient PrintWriter recordLog;
 	private volatile boolean record;
 	protected volatile boolean playback;
 	private ArrayList<ControllerEvent> queue = new ArrayList<ControllerEvent>();
@@ -67,7 +67,7 @@ public class DefaultGUI implements GUI, ComponentListener, KeyListener {
 	protected Clock clock;
 	
 	protected volatile boolean terminate = false;
-	protected AiAgent agent = null;
+	protected transient AiAgent agent = null;
 	
 	public DefaultGUI()
 	{

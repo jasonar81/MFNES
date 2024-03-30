@@ -8,8 +8,6 @@ public class Main {
 	private static Memory ppuMem;
 	private static Memory cpuMem;
 	private static Thread cpuThread;
-	private static Thread ppuThread;
-	private static Thread apuThread;
 	private static GUI gui;
 	private static Thread guiThread;
 	private static String previousCommand = "";
@@ -573,9 +571,7 @@ public class Main {
 	
 	private static void reset()
 	{
-		apu.setReset();
 		cpu.setReset();
-		ppu.setReset();
 	}
 	
 	private static void write(String remainder)
@@ -679,13 +675,11 @@ public class Main {
 	private static void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private static void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
 	}
 	
 	private static void off()
@@ -693,9 +687,7 @@ public class Main {
 		if (on)
 		{
 			on = false;
-			apu.terminate();
 			cpu.terminate();
-			ppu.terminate();
 			gui.terminate();
 			
 			try
@@ -712,7 +704,6 @@ public class Main {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private static void on()
@@ -720,16 +711,9 @@ public class Main {
 		if (!on)
 		{
 			on = true;
-			ppuThread = new Thread(ppu);
-			ppuThread.setPriority(10);
 			cpuThread = new Thread(cpu);
 			cpuThread.setPriority(10);
-			apuThread = new Thread(apu);
-			apuThread.setPriority(10);
 			cpu.debugHold(true);
-			ppu.debugHold(true);
-			apuThread.start();
-			ppuThread.start();
 			cpuThread.start();
 		}
 	}

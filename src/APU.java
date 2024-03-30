@@ -11,9 +11,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class APU implements Runnable, Serializable {
 private static final long serialVersionUID = -6732487624928621347L;
 
-	private transient CPU cpu;
+	private CPU cpu;
 	private transient GUI gui;
-	private transient Clock clock;
+	private Clock clock;
 	private long previous = -3;
 	private int audioEnableFlags = 0;
 	private boolean dmcInterruptFlag = false;
@@ -108,30 +108,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 	private int pulse2Value;
 	private int triangleValue;
 	
-	private volatile boolean terminate = false;
-	private volatile boolean reset = false;
-	
 	private volatile boolean disableFrameInterrupts = false;
-	
-	private transient AtomicBoolean syncRequested = new AtomicBoolean(false);
-	private transient AtomicBoolean syncGranted = new AtomicBoolean(false);
 	
 	public APU(CPU cpu, GUI gui, Clock clock) 
 	{
 		this.cpu = cpu;
 		this.gui = gui;
 		this.clock = clock;
-	}
-	
-	public void setRestart()
-	{
-		resetSync();
-	}
-	
-	public void resetSync()
-	{
-		syncRequested = new AtomicBoolean(false);
-		syncGranted = new AtomicBoolean(false);
 	}
 	
 	public void setCpu(CPU cpu)
@@ -149,72 +132,14 @@ private static final long serialVersionUID = -6732487624928621347L;
 		this.clock = clock;
 	}
 	
-	public void sync1()
-	{
-		syncRequested.set(true);
-	}
-	
-	public synchronized void sync()
-	{
-		if (syncRequested.get())
-		{
-			syncGranted.set(true);
-			syncRequested.set(false);
-		}
-	}
-	
-	public boolean sync2()
-	{
-		return syncGranted.get();
-	}
-	
-	public void release()
-	{
-		syncGranted.set(false);
-	}
-	
 	public void run()
 	{
-		while (!terminate)
-		{
-			long current = clock.getCpuExpectedCycle();
-			for (long i = previous + 3; i <= current; i += 3)
-			{
-				runPerCycleAudioLogic(i);
-				if (syncRequested.get())
-				{
-					sync();
-					while (syncGranted.get()) {}
-				}
-			}
-			previous = current;
-			
-			if (reset)
-			{
-				reset();
-			}
-			
-			if (syncRequested.get())
-			{
-				sync();
-				while (syncGranted.get()) {}
-			}
-		}
+		runPerCycleAudioLogic(clock.getCpuExpectedCycle());
 	}
 	
 	public void setDisableFrameInterrupt(boolean val)
 	{
 		disableFrameInterrupts = val;
-	}
-	
-	public void setReset()
-	{
-		reset = true;
-	}
-	
-	public void terminate()
-	{
-		terminate = true;
 	}
 	
 	public void setNoiseLengthCounter(int val)
@@ -575,7 +500,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 		triangleInternalIndex = 0;
 		dmcOutputUnit &= 0x03;
 		previous = -1;
-		reset = false;
 		dmcSamplesRemaining = 0;
 	}
 	

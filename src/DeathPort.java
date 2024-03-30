@@ -7,7 +7,7 @@ private static final long serialVersionUID = -6732487624928621347L;
 	private byte val;
 	private byte lookoutVal;
 	private transient AiAgent agent;
-	private transient Clock clock;
+	private Clock clock;
 	
 	public DeathPort(byte lookoutVal, AiAgent agent, Clock clock)
 	{
@@ -15,6 +15,11 @@ private static final long serialVersionUID = -6732487624928621347L;
 		this.lookoutVal = lookoutVal;
 		this.agent = agent;
 		this.clock = clock;
+	}
+	
+	public void setAgent(AiAgent agent)
+	{
+		this.agent = agent;
 	}
 	
 	@Override

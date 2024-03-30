@@ -20,8 +20,8 @@ public class Megaman2DecisionTree implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
-	private Thread ppuThread;
-	private Thread apuThread;
+	
+	
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
@@ -638,9 +638,9 @@ public class Megaman2DecisionTree implements AiAgent {
 	
 	private void teardown()
 	{
-		apu.terminate();
+		
 		cpu.terminate();
-		ppu.terminate();
+		
 		gui.terminate();
 		
 		try
@@ -665,21 +665,21 @@ public class Megaman2DecisionTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
+		
 	}
 	
 	private void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
+		
+		
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread(apu);
-		apuThread.setPriority(10);
+		
+		
 		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
+		
+		
+		
 		cpuThread.start();
 	}
 	
@@ -711,20 +711,20 @@ public class Megaman2DecisionTree implements AiAgent {
 	private void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
+		
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
+		
 	}
 	
 	public synchronized void progress(long cycle)
 	{
 		pause();
 		
-		int bossHp = cpu.getMem().getLayout()[0x6c1].read();
+		int bossHp = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x6c1].read());
 		int lives = cpu.getMem().getLayout()[0xa8].read();
 		if (previousBossHp != bossHp)
 		{

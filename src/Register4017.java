@@ -12,6 +12,11 @@ public class Register4017 implements MemoryPort {
 		apu = cpu.getApu();
 	}
 	
+	public void setGui(GUI gui)
+	{
+		this.gui = gui;
+	}
+	
 	public byte read() {
 		boolean read = false;
 		switch (r4016.counter2)

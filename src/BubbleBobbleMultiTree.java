@@ -1,6 +1,10 @@
 import java.awt.event.KeyEvent;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -8,7 +12,7 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BubbleBobbleAi2 implements AiAgent {
+public class BubbleBobbleMultiTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -16,8 +20,6 @@ public class BubbleBobbleAi2 implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
-	private Thread ppuThread;
-	private Thread apuThread;
 	private GUI gui;
 	private Thread guiThread;
 	private volatile long highScore = 0;
@@ -28,41 +30,74 @@ public class BubbleBobbleAi2 implements AiAgent {
 	private volatile long previousScore = 0;
 	private volatile long previousFinishTime = 0;
 	
-	private static BubbleBobbleAi2 instance;
+	private static BubbleBobbleMultiTree instance;
 	
 	private long firstUsableCycle = 52853029;
 	private volatile ArrayList<Long> screenScores;
 	private ArrayList<Long> bestScreenScores = new ArrayList<Long>();
-	private ControllerNeuralNet net;
-	private long numControllerRequests = 200000;
-	private int layerSize = 18;
-	private int numLayers = 3;
+	private MultiDecisionTree tree;
+	private MultiTreeController controller;
+	private long numControllerRequests = 10000;
+	
+	private long usedControllerRequests;
+	
+	private static int A = 0x80;
+	private static int B = 0x40;
+	private static int UP = 0x20;
+	private static int DOWN = 0x10;
+	private static int LEFT = 0x08;
+	private static int RIGHT = 0x04;
+	private static int SELECT = 0x02;
+	private static int START = 0x01;
+	
+	private int countWithNoImprovement = 0;
 	
 	public static void main(String[] args)
 	{
-		instance = new BubbleBobbleAi2();
+		instance = new BubbleBobbleMultiTree();
 		instance.main();
 	}
 	
 	private void main()
 	{
-		boolean fileExists = false;
-		if (!loadNet())
+		ArrayList<Integer> validStates = new ArrayList<Integer>();
+		validStates.add(0);
+		validStates.add(LEFT);
+		validStates.add(RIGHT);
+		validStates.add(LEFT | A);
+		validStates.add(RIGHT | A);
+		validStates.add(LEFT | B);
+		validStates.add(RIGHT | B);
+		validStates.add(LEFT | A | B);
+		validStates.add(RIGHT | A | B);
+		validStates.add(A);
+		validStates.add(B);
+		validStates.add(A | B);
+		
+		if (!loadTree())
 		{
-			 net = new ControllerNeuralNet(false, layerSize, numLayers, true);
-			 net.randomInit();
-		}
-		else
-		{
-			fileExists = true;
-			System.out.println("Successfully load a " + layerSize + "x" + numLayers + " net with up to " + numControllerRequests + " events");
+			ArrayList<Integer> addresses = new ArrayList<Integer>();
+			addresses.add(0x401);
+			ArrayList<Integer> disallow = new ArrayList<Integer>();
+			disallow.add(0x2e);
+			
+			IfElseNode root = new IfElseNode();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			
+			tree = new MultiDecisionTree(validStates, addresses, root, disallow);
 		}
 		
+		controller = new MultiTreeController(tree);
+		tree.setValidStates(validStates);
 		setup();
 		load("bubble_bobble.nes", "sav");
 		makeModifications();
-		net.reset();
-		net.setCpuMem(cpuMem);
+		controller.reset();
+		controller.setCpuMem(cpuMem);
+		controller.setTree(tree);
+		tree.setRunAllMode();
+		tree.reset();
 		run();
 		
 		while (!done) {}
@@ -76,27 +111,24 @@ public class BubbleBobbleAi2 implements AiAgent {
 		
 		teardown();
 		
-		if (!fileExists)
-		{
-			System.out.println("File did not exist, so saving newly created network");
-			saveNet();
-		}
-		
 		while (true)
 		{
-			net.updateParameters();
+			numControllerRequests = usedControllerRequests * 3;
 			setup();
 			load("bubble_bobble.nes", "sav");
 			makeModifications();
-			net.reset();
-			net.setCpuMem(cpuMem);
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunAllMode();
+			tree.reset();
 			run();
 			
 			while (!done) {}
 			
 			printResults();
 			System.out.println("Score of " + score);
-			
+
 			processScreenResults();
 	
 			teardown();
@@ -104,76 +136,186 @@ public class BubbleBobbleAi2 implements AiAgent {
 			{
 				highScore = score;
 				System.out.println("New high score!");
-				saveNet();
-				if (numControllerRequests < 300000000)
-				{
-					numControllerRequests *= 2;
-				}
+				saveTree();
 			}
 			else
 			{
-				net.revertParameters();
-				saveNet();
+				break;
 			}
 		}
-	}
-	
-	private void saveNet()
-	{
-		try
+		
+		int sceneNum = tree.getLastSceneNum();
+		countWithNoImprovement = tree.getLastNoImprovementCount();
+		while (true)
 		{
-			FileWriter file = new FileWriter("bubble_bobble.net");
-			PrintWriter out = new PrintWriter(file);
-			out.println(net.getParamNumToUpdate());
-			out.println(layerSize);
-			out.println(numLayers);
-			out.println(numControllerRequests);
-			
-			int numParameters = net.numParameters();
-			for (int i = 0; i < numParameters; ++i)
+			//play screen until no deaths 
+			System.out.println("Working on scene " + sceneNum);
+			while (sceneNum >= tree.numScenes())
 			{
-				out.println(net.getParameter(i));
+				sceneNum--;
 			}
 			
-			out.close();
-		}
-		catch(Exception e)
-		{
-			e.printStackTrace();
+			if (!workOnScene(sceneNum))
+			{
+				if (sceneNum > 0)
+				{
+					sceneNum--;
+				}
+				
+				continue;
+			}
+			
+			//play all
+			numControllerRequests *= 2;
+			setup();
+			load("bubble_bobble.nes", "sav");
+			makeModifications();
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunAllMode();
+			tree.reset();
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+			numControllerRequests = usedControllerRequests * 3;
+	
+			teardown();
+			saveTree();
+			++sceneNum;
 		}
 	}
 	
-	private boolean loadNet()
+	private boolean workOnScene(int sceneNum)
+	{
+		countWithNoImprovement = 0;
+		while (true)
+		{
+			setup();
+			load("bubble_bobble.nes", "sav");
+			makeModifications();
+			controller.reset();
+			controller.setCpuMem(cpuMem);
+			controller.setTree(tree);
+			tree.setRunSceneMode(sceneNum, countWithNoImprovement);
+			tree.setRegister4016(((Register4016)cpu.getMem().getLayout()[0x4016]));
+			run();
+			
+			while (!done) {}
+			
+			System.out.println("Score of " + score);
+			
+			HashSet<Integer> addressesAndValues = tree.getAddressesAndValues();
+	
+			teardown();
+			
+			if (score > highScore && confirm(sceneNum))
+			{
+				countWithNoImprovement = 0;
+				highScore = score;
+				System.out.println("New high score with scene num = " + sceneNum);
+				tree.persist();
+				saveTree();
+			} else if (score == highScore)
+			{
+				countWithNoImprovement++;
+				tree.persist();
+				saveTree();
+			}
+			else 
+			{
+				countWithNoImprovement++;
+				tree.revert();
+			}
+			
+			if (countWithNoImprovement > 300)
+			{
+				return completedScene();
+			}
+			else
+			{
+				System.out.println("No improvement count: " + countWithNoImprovement);
+			}
+			
+			System.out.println("Addresses and values size = " + addressesAndValues.size());
+			System.out.println("Completed scene = " + completedScene());
+			tree.mutate(addressesAndValues);
+		}
+	}
+	
+	private boolean completedScene()
+	{
+		return tree.foundNextKey();
+	}
+	
+	private boolean confirm(int sceneNum)
+	{
+		long minHighScore = score;
+		setup();
+		load("bubble_bobble.nes", "sav");
+		makeModifications();
+		controller.reset();
+		controller.setCpuMem(cpuMem);
+		controller.setTree(tree);
+		tree.setRunSceneMode(sceneNum);
+		tree.setRegister4016(((Register4016)cpu.getMem().getLayout()[0x4016]));
+		run();
+		
+		while (!done) {}
+		
+		System.out.println("Score of " + score);
+		
+		if (score < minHighScore)
+		{
+			minHighScore = score;
+		}
+
+		teardown();
+		
+		score = minHighScore;
+		return (score > highScore);
+	}
+	
+	private boolean loadTree()
 	{
 		try
 		{
-			File file = new File("bubble_bobble.net");
+			File file = new File("bubble_bobble_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
 			}
 			
-			Scanner in = new Scanner(file);
-			String line = in.nextLine();
-			int paramNumToUpdate = Integer.parseInt(line);
-			line = in.nextLine();
-			layerSize = Integer.parseInt(line);
-			line = in.nextLine();
-			numLayers = Integer.parseInt(line);
-			line = in.nextLine();
-			numControllerRequests = Long.parseLong(line);
-			net = new ControllerNeuralNet(false, layerSize, numLayers, false);
-			net.setParamNumToUpdate(paramNumToUpdate);
-			
-			int paramNum = 0;
-			while (in.hasNextLine() && net.hasMoreSetup())
-			{
-				line = in.nextLine();
-				int val = Integer.parseInt(line);
-				net.setParameter(val, paramNum++);
-			}
-			
-			in.close();
+			FileInputStream f = new FileInputStream(file);
+			ObjectInputStream i = new ObjectInputStream(f);
+	
+			tree = (MultiDecisionTree)i.readObject();
+			tree.makeWhole();
+	
+			i.close();
+			f.close();
+		}
+		catch(Exception e)
+		{
+			e.printStackTrace();
+		}
+		
+		return true;
+	}
+	
+	private boolean saveTree()
+	{
+		try
+		{
+			File file = new File("bubble_bobble_scenes.tree");
+			FileOutputStream f = new FileOutputStream(file);
+			ObjectOutputStream o = new ObjectOutputStream(f);
+	
+			o.writeObject(tree);
+			o.close();
+			f.close();
 		}
 		catch(Exception e)
 		{
@@ -197,7 +339,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 				20452414, 20834989, 22643841, 23248948, 26187211, 27332024, 38767736, 38767882,
 				45561100, 46095082};
 		clock = new Clock();
-		gui = new NetGui(false, numControllerRequests, firstUsableCycle, net, startOnOffTimes, clock);
+		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
@@ -217,9 +359,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 	
 	private void teardown()
 	{
-		apu.terminate();
 		cpu.terminate();
-		ppu.terminate();
 		gui.terminate();
 		
 		try
@@ -244,7 +384,6 @@ public class BubbleBobbleAi2 implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private void printResults()
@@ -260,16 +399,9 @@ public class BubbleBobbleAi2 implements AiAgent {
 	
 	private void on()
 	{
-		ppuThread = new Thread(ppu);
-		ppuThread.setPriority(10);
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
-		apuThread = new Thread (apu);
-		apuThread.setPriority(10);
 		cpu.debugHold(true);
-		ppu.debugHold(true);
-		ppuThread.start();
-		apuThread.start();
 		cpuThread.start();
 	}
 	
@@ -279,6 +411,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 		Clock.periodNanos = 1.0;
 		cpu.getMem().getLayout()[0x2e] = new NotifyChangesPort(this, clock); //Lives remaining
 		cpu.getMem().getLayout()[0x401] = new SaveAndUpdateMaxValuePort(this, clock); //Level (0 doesn't count)
+		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
 	public void setDone(long totalTime)
@@ -292,19 +425,18 @@ public class BubbleBobbleAi2 implements AiAgent {
 			screenScores.add(screenScore);
 			score += screenScore;
 			done = true;
+			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
 		}
 	}
 	
 	private void pause()
 	{
 		cpu.debugHold(true);
-		ppu.debugHold(true);
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
-		ppu.debugHold(false);
 	}
 	
 	private boolean processScreenResults()
@@ -350,7 +482,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 				screenScores.add(screenScore);
 				score += screenScore;
 			}
-			else if (cpu.getMem().getLayout()[0x2e].read() == 0)
+			else if (cpu.getMem().getLayout()[0x2e].read() == 2)
 			{
 				setDone(cycle);
 			}
@@ -369,7 +501,6 @@ public class BubbleBobbleAi2 implements AiAgent {
 		}
 		
 		seconds = 255 - seconds;
-		seconds <<= 24;
 		long lives = cpu.getMem().read(0x2e);
 		System.out.println("Remaining lives = " + lives);
 		lives <<= 32;
@@ -380,6 +511,8 @@ public class BubbleBobbleAi2 implements AiAgent {
 		{
 			delta = 0;
 		}
+		
+		delta <<= 8;
 		
 		System.out.println("Score in this level = " + delta);
 		previousScore = gameScore;
@@ -400,6 +533,7 @@ public class BubbleBobbleAi2 implements AiAgent {
 			delta = 0;
 		}
 		
+		delta <<= 8;
 		System.out.println("Score in this level = " + delta);
 		return lives + seconds + delta;
 	}

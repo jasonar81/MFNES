@@ -3,7 +3,7 @@
 public class TrackSumOfSubtractionsPort implements MemoryPort {
 	private byte val;
 	private transient AiAgent agent;
-	private transient Clock clock;
+	private Clock clock;
 	private volatile int sum = 0;
 	private boolean report;
 	
@@ -13,6 +13,11 @@ public class TrackSumOfSubtractionsPort implements MemoryPort {
 		this.agent = agent;
 		this.clock = clock;
 		this.report = report;
+	}
+	
+	public void setAgent(AiAgent agent)
+	{
+		this.agent = agent;
 	}
 	
 	@Override

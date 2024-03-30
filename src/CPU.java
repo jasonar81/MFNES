@@ -1,8 +1,12 @@
 //Ye old 6502 without BCD support
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileWriter;
 import java.io.Serializable;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -33,13 +37,13 @@ private static final long serialVersionUID = -6732487624928621347L;
 	private AtomicBoolean reset;
 	private AtomicBoolean stepFlag;
 	private AtomicBoolean irq;
-	private transient PPU ppu;
+	private PPU ppu;
 	private transient PrintStream log;
 	private volatile PrintStream out;
 	private long overage = 0;
 	private boolean inNmi = false;
 	private transient GUI gui;
-	private transient APU apu;
+	private APU apu;
 	private boolean check = false;
 	private boolean restart = false;
 	
@@ -85,6 +89,16 @@ private static final long serialVersionUID = -6732487624928621347L;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	public GUI getGui()
+	{
+		return gui;
+	}
+	
+	public PPU getPpu()
+	{
+		return ppu;
 	}
 	
 	public void setRestart()
@@ -249,6 +263,8 @@ private static final long serialVersionUID = -6732487624928621347L;
 		{
 			setReset();
 			cycle = 0;
+			ppu.cycle = 0;
+			ppu.frameStart = cycle;
 		}
 		
 		while (true)
@@ -271,7 +287,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 			if (pc == breakAddress.get())
 			{
 				debugHold.set(true);
-				ppu.debugHold(true);
 				synchronized(System.out) 
 				{
 					System.out.println("Breakpoint hit");
@@ -304,6 +319,8 @@ private static final long serialVersionUID = -6732487624928621347L;
 			if (reset.get())
 			{
 				reset();
+				ppu.reset();
+				apu.reset();
 				reset.set(false);
 			}
 			else if (nmi.get())
@@ -333,10 +350,6 @@ private static final long serialVersionUID = -6732487624928621347L;
 			}
 			
 			stepFlag.set(false);
-			if (stepCycles != 0)
-			{
-				ppu.step(cycle - stepCycles);
-			}
 		}
 	}
 	
@@ -3562,22 +3575,16 @@ private static final long serialVersionUID = -6732487624928621347L;
 	public void incrementCycle()
 	{
 		cycle += 3;
-		clock.setCpuExpectedCycle(cycle);
-		
 		if (!stepFlag.get())
 		{
-			long expected = clock.getPpuExpectedCycle();
-			while (expected < cycle) 
-			{
-				if (terminate.get())
-				{
-					return;
-				}
-				
-				expected = clock.getPpuExpectedCycle();
-			}
+			ppu.run();
+			ppu.run();
+			ppu.run();
 		}
 		
+		apu.run();
+		clock.setCpuExpectedCycle(cycle);
+		clock.setPpuExpectedCycle(cycle);
 		if (overage > 0)
 		{
 			overage -= 3;

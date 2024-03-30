@@ -3,13 +3,18 @@
 public class NonZeroDoneRamPort implements MemoryPort {
 	private byte val;
 	private transient AiAgent agent;
-	private transient Clock clock;
+	private Clock clock;
 	
 	public NonZeroDoneRamPort(AiAgent agent, Clock clock)
 	{
 		val = 0;
 		this.agent = agent;
 		this.clock = clock;
+	}
+	
+	public void setAgent(AiAgent agent)
+	{
+		this.agent = agent;
 	}
 	
 	@Override

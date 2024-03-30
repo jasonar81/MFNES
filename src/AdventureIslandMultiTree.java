@@ -1,20 +1,18 @@
 import java.awt.event.KeyEvent;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
-public class ContraMultiTree implements AiAgent{
+public class AdventureIslandMultiTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -24,24 +22,20 @@ public class ContraMultiTree implements AiAgent{
 	private Thread cpuThread;
 	private GUI gui;
 	private Thread guiThread;
-	private volatile long highScore = 0;
-	private volatile boolean done;
+	private volatile double highScore = 0;
+	private volatile double finalScore;
+	private volatile boolean done = false;
 	private volatile boolean startedDone;
-	private volatile ArrayList<Long> deaths = new ArrayList<Long>();
 	private volatile long score;
-	private volatile long possibleScoreIncrement;
+	private volatile long livesLost;
 	
-	private static ContraMultiTree instance;
+	private static AdventureIslandMultiTree instance;
 	
-	private long firstUsableCycle = 62407559;
-	private volatile long previousProgressCycle;
-	private volatile long previousProgressScore;
-	private volatile long remainingLives;
-	private volatile long previousRemainingLives;
-	private volatile long previousProgressShots;
+	private long firstUsableCycle = 14726584;
 	private MultiDecisionTree tree;
 	private MultiTreeController controller;
-	private long numControllerRequests = 7500;
+	private long numControllerRequests = 5000;
+	
 	private long usedControllerRequests;
 	
 	private static int A = 0x80;
@@ -57,7 +51,7 @@ public class ContraMultiTree implements AiAgent{
 	
 	public static void main(String[] args)
 	{
-		instance = new ContraMultiTree();	
+		instance = new AdventureIslandMultiTree();
 		instance.main();
 	}
 	
@@ -65,60 +59,38 @@ public class ContraMultiTree implements AiAgent{
 	{
 		ArrayList<Integer> validStates = new ArrayList<Integer>();
 		validStates.add(0);
-		validStates.add(UP);
-		validStates.add(DOWN);
 		validStates.add(LEFT);
 		validStates.add(RIGHT);
-		validStates.add(UP | A);
-		validStates.add(DOWN | A);
 		validStates.add(LEFT | A);
-		validStates.add(RIGHT | A);
-		validStates.add(UP | B);
-		validStates.add(DOWN | B);
+		validStates.add(RIGHT | A);;
 		validStates.add(LEFT | B);
 		validStates.add(RIGHT | B);
-		validStates.add(UP | A | B);
-		validStates.add(DOWN | A | B);
 		validStates.add(LEFT | A | B);
 		validStates.add(RIGHT | A | B);
 		validStates.add(A);
 		validStates.add(B);
 		validStates.add(A | B);
 		
-		validStates.add(UP | LEFT);
-		validStates.add(UP | LEFT | A);
-		validStates.add(UP | LEFT | B);
-		validStates.add(UP | LEFT | A | B);
-		validStates.add(UP | RIGHT);
-		validStates.add(UP | RIGHT | A);
-		validStates.add(UP | RIGHT | B);
-		validStates.add(UP | RIGHT | A | B);
-		validStates.add(DOWN | LEFT);
-		validStates.add(DOWN | LEFT | A);
-		validStates.add(DOWN | LEFT | B);
-		validStates.add(DOWN | LEFT | A | B);
-		validStates.add(DOWN | RIGHT);
-		validStates.add(DOWN | RIGHT | A);
-		validStates.add(DOWN | RIGHT | B);
-		validStates.add(DOWN | RIGHT | A | B);
-		
 		if (!loadTree())
 		{
 			ArrayList<Integer> addresses = new ArrayList<Integer>();
-			addresses.add(0x30);
-			addresses.add(0x64);
+			addresses.add(0x37);
+			addresses.add(0x38);
+			addresses.add(0x39);
 			ArrayList<Integer> disallow = new ArrayList<Integer>();
-			disallow.add(0x32);
-			IfElseNode defaultTree = new IfElseNode();
-			defaultTree.terminal = true;
-			defaultTree.terminalValue = RIGHT;
-			tree = new MultiDecisionTree(validStates, addresses, defaultTree, disallow);
+			disallow.add(0x3f);
+			
+			IfElseNode root = new IfElseNode();
+			root.terminal = true;
+			root.terminalValue = RIGHT;
+			
+			tree = new MultiDecisionTree(validStates, addresses, root, disallow);
 		}
 		
 		controller = new MultiTreeController(tree);
 		tree.setValidStates(validStates);
 		setup();
-		load("contra.nes");
+		load("adventure_island.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -130,9 +102,9 @@ public class ContraMultiTree implements AiAgent{
 		while (!done) {}
 		
 		printResults();
-		System.out.println("Score of " + score);
+		System.out.println("Score of " + finalScore);
 
-		highScore = score;
+		highScore = finalScore;
 		System.out.println("New high score!");
 		
 		teardown();
@@ -141,7 +113,7 @@ public class ContraMultiTree implements AiAgent{
 		{
 			numControllerRequests = usedControllerRequests * 3;
 			setup();
-			load("contra.nes");
+			load("adventure_island.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -153,12 +125,12 @@ public class ContraMultiTree implements AiAgent{
 			while (!done) {}
 			
 			printResults();
-			System.out.println("Score of " + score);
+			System.out.println("Score of " + finalScore);
 	
 			teardown();
-			if (score > highScore)
+			if (finalScore > highScore)
 			{
-				highScore = score;
+				highScore = finalScore;
 				System.out.println("New high score!");
 				saveTree();
 			}
@@ -192,7 +164,7 @@ public class ContraMultiTree implements AiAgent{
 			//play all
 			numControllerRequests *= 2;
 			setup();
-			load("contra.nes");
+			load("adventure_island.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -203,8 +175,7 @@ public class ContraMultiTree implements AiAgent{
 			
 			while (!done) {}
 			
-			printResults();
-			System.out.println("Score of " + score);
+			System.out.println("Score of " + finalScore);
 			numControllerRequests = usedControllerRequests * 3;
 	
 			teardown();
@@ -219,7 +190,7 @@ public class ContraMultiTree implements AiAgent{
 		while (true)
 		{
 			setup();
-			load("contra.nes");
+			load("adventure_island.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -230,21 +201,20 @@ public class ContraMultiTree implements AiAgent{
 			
 			while (!done) {}
 			
-			printResults();
-			System.out.println("Score of " + score);
+			System.out.println("Score of " + finalScore);
 			
 			HashSet<Integer> addressesAndValues = tree.getAddressesAndValues();
 	
 			teardown();
 			
-			if (score > highScore && confirm(sceneNum))
+			if (finalScore > highScore && confirm(sceneNum))
 			{
 				countWithNoImprovement = 0;
-				highScore = score;
+				highScore = finalScore;
 				System.out.println("New high score with scene num = " + sceneNum);
 				tree.persist();
 				saveTree();
-			} else if (score == highScore)
+			} else if (finalScore == highScore)
 			{
 				countWithNoImprovement++;
 				tree.persist();
@@ -278,9 +248,9 @@ public class ContraMultiTree implements AiAgent{
 	
 	private boolean confirm(int sceneNum)
 	{
-		long minHighScore = score;
+		double minHighScore = finalScore;
 		setup();
-		load("contra.nes");
+		load("adventure_island.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -291,25 +261,24 @@ public class ContraMultiTree implements AiAgent{
 		
 		while (!done) {}
 		
-		printResults();
-		System.out.println("Score of " + score);
+		System.out.println("Score of " + finalScore);
 		
-		if (score < minHighScore)
+		if (finalScore < minHighScore)
 		{
-			minHighScore = score;
+			minHighScore = finalScore;
 		}
 
 		teardown();
 		
-		score = minHighScore;
-		return (score > highScore);
+		finalScore = minHighScore;
+		return (finalScore > highScore);
 	}
 	
 	private boolean loadTree()
 	{
 		try
 		{
-			File file = new File("contra_scenes.tree");
+			File file = new File("adventure_island_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -336,7 +305,7 @@ public class ContraMultiTree implements AiAgent{
 	{
 		try
 		{
-			File file = new File("contra_scenes.tree");
+			File file = new File("adventure_island_scenes.tree");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -354,24 +323,17 @@ public class ContraMultiTree implements AiAgent{
 	
 	private void setup()
 	{
+		livesLost = 0;
 		score = 0;
-		possibleScoreIncrement = 0;
-		previousProgressCycle = 0;
-		previousProgressScore = 0;
-		remainingLives = 3;
-		previousRemainingLives = 3;
-		previousProgressShots = 0;
 		done = false;
 		startedDone = false;
 		
+		long[] startOnOffTimes = new long[] {10949986, 11684489, 13767487, 14726583};
 		clock = new Clock();
-		long[] startOnOffTimes = new long[] {11426048, 12714767, 26833377, 28715336};
 		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
 		guiThread.setPriority(10);
 		guiThread.start();
-		deaths.clear();
-		deaths = deaths;
 		
 		ppuMem = new Memory(Memory.PPU, null, gui);
 		ppu = new PPU(clock, ppuMem, gui);
@@ -396,22 +358,15 @@ public class ContraMultiTree implements AiAgent{
 			Thread.sleep(1000);
 		}
 		catch(Exception e) {}
-		cpu = null;
-		ppu = null;
-		cpuMem = null;
-		ppuMem = null;
-		apu = null;
-		clock = null;
-		gui = null;
 	}
 
-	private void load(String filename)
+	private void load(String filename, String saveFilename)
 	{
 		Cartridge cart = Cartridge.loadCart(filename);
 		
 		if (cart != null)
 		{
-			cpu.setupCart(cart);
+			cpu.setupCart(cart, saveFilename);
 			ppu.setupCart(cart);
 		}
 	}
@@ -422,6 +377,11 @@ public class ContraMultiTree implements AiAgent{
 		cpu.debugHold(false);
 	}
 	
+	private void printResults()
+	{
+		System.out.println("Game score = " + gameScore());
+	}
+	
 	private void on()
 	{
 		cpuThread = new Thread(cpu);
@@ -430,26 +390,13 @@ public class ContraMultiTree implements AiAgent{
 		cpuThread.start();
 	}
 	
-	private void printResults()
-	{
-		System.out.println("Game completions = " + cpu.getMem().read(0x31));
-		System.out.println("Level = " + cpu.getMem().read(0x30));
-		System.out.println("Screen in level = " + ((SaveMaxValueAndClearElsewherePort)cpu.getMem().getLayout()[0x64]).getMaxValue());
-		System.out.println("Distance into screen = " + ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue());
-		System.out.println("Score = " + getGameScore());
-	}
-	
 	private void makeModifications()
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x34] = new RomMemoryPort((byte)0); //Fix the randomizer value
-		//cpu.getMem().getLayout()[0x32] = new RomMemoryPort((byte)63); //Always report back 63 lives remaining
-		cpu.getMem().getLayout()[0x3a] = new DoneRamPort((byte)2, this, clock); //When continues decrements to 2, call it a wrap
-		cpu.getMem().getLayout()[0x65] = new SaveMaxValuePort(); //Distance into current screen
-		cpu.getMem().getLayout()[0x64] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x65], false, true, this, clock); //Screen number in level
-		cpu.getMem().getLayout()[0x30] = new SaveMaxValueAndClearElsewherePort(cpu.getMem().getLayout()[0x64], false, true, this, clock); //Level
-		cpu.getMem().getLayout()[0xb4] = new DeathPort((byte)1, this, clock); //Detect a death
+		cpu.getMem().getLayout()[0x3f] = new NotifyChangesPort(this, clock); //lives
+		cpu.getMem().getLayout()[0x72] = new NotifyChangesPort(this, clock); //status
+		cpu.getMem().getLayout()[0x39] = new NotifyChangesPort(this, clock); 
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -457,43 +404,15 @@ public class ContraMultiTree implements AiAgent{
 	{
 		if (!startedDone && !done)
 		{
+			pause();
+			System.out.println("Done");
 			startedDone = true;
+			++livesLost;
+			score += gameScore();
+			finalScore = score;
 			done = true;
-			if (possibleScoreIncrement != 0)
-			{
-				score += possibleScoreIncrement;
-			}
-			else
-			{
-				long scoreDelta = getGameScore() - previousProgressScore;
-				long offset = getScreenOffset();
-				offset *= (256 * 256 * 256);
-				scoreDelta += (256 - Byte.toUnsignedInt(cpu.getMem().getLayout()[0x31a].read()));
-				scoreDelta *= 256;
-				
-				score += (offset + scoreDelta);
-			}
-			
 			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
 		}
-	}
-	
-	public synchronized void setDeath(long cycle)
-	{
-		pause();
-		
-		deaths.add(cycle);
-		deaths = deaths;
-		
-		--remainingLives;
-		
-		long scoreDelta = getGameScore() - previousProgressScore;
-		
-		long offset = getScreenOffset();
-		
-		possibleScoreIncrement = ((offset << 32) + (scoreDelta << 8));
-		setDone(clock.getPpuExpectedCycle());
-
 	}
 	
 	private void pause()
@@ -508,66 +427,132 @@ public class ContraMultiTree implements AiAgent{
 	
 	public synchronized void progress(long cycle)
 	{
-		long currentScore = getGameScore();
 		pause();
-		long timeScore = (long)(255.0 - ((cycle - previousProgressCycle) / 5369317.5));
-		System.out.println("Took " + ((cycle - previousProgressCycle) / 5369317.5) + " seconds");
-		if (timeScore < 0)
+		
+		if (cycle >= firstUsableCycle)
 		{
-			timeScore = 0;
+			if (cpu.getMem().getLayout()[0x72].read() == (byte)0xff)
+			{
+				setDone(cycle);
+				return;
+			}
+			
+			long level = cpu.getMem().getLayout()[0x39].read() + cpu.getMem().getLayout()[0x38].read() * 4 + cpu.getMem().getLayout()[0x37].read() * 16;
+			long health =Byte.toUnsignedLong(cpu.getMem().getLayout()[0x76].read());
+			
+			if (level > 0)
+			{
+				score += level * 100000000000L;
+				score += health * 100000000;
+			}
 		}
-	
-		long offset = 255;
-		long scoreDelta = currentScore;
-		System.out.println("Score " + scoreDelta + " points");
-		
-		
-		previousProgressCycle = cycle;
-		previousProgressScore = currentScore;
-		previousRemainingLives = remainingLives;
-		previousProgressShots = getTotalShots();
-		score += (timeScore + (offset << 32) + (scoreDelta << 8));
 		
 		cont();
 	}
 	
-	private int getGameScore()
+	private long gameScore()
 	{
-		int retval = (cpu.getMem().read(0x07e3) << 8) + cpu.getMem().read(0x07e2);
-		if (cpu.getMem().read(0x30) == 0 && cpu.getMem().read(0x64) == 0x0c)
+		long retval = 0;
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x6a2].read());
+		if (val != 0xff)
 		{
-			//Count progress on beating level 1 boss that is not reflected in score
-			System.out.println("At level 1 boss");
-			int remainingHp = cpu.getMem().read(0x578) + 
-					cpu.getMem().read(0x579) +
-					cpu.getMem().read(0x57a) +
-					cpu.getMem().read(0x57b) +
-					cpu.getMem().read(0x57c) +
-					cpu.getMem().read(0x57d) +
-					cpu.getMem().read(0x57e) +
-					cpu.getMem().read(0x57f) +
-					cpu.getMem().read(0x580) +
-					cpu.getMem().read(0x581) +
-					cpu.getMem().read(0x582) +
-					cpu.getMem().read(0x583) +
-					cpu.getMem().read(0x584) +
-					cpu.getMem().read(0x585) +
-					cpu.getMem().read(0x586) +
-					cpu.getMem().read(0x587);
-			System.out.println("Remaining HP = " + remainingHp);
-			retval += (256 * 16) - remainingHp;
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
 		}
 		
+		retval += val;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x6a1].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 10;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x6a0].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 100;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x69f].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 1000;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x69e].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 10000;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x69d].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 100000;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x69c].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 1000000;
+		
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x69b].read());
+		if (val != 0xff)
+		{
+			val -= 0xf5;
+		}
+		else
+		{
+			val = 0;
+		}
+		
+		retval += val * 10000000;
 		return retval;
 	}
 	
-	private long getScreenOffset()
-	{
-		return ((SaveMaxValuePort)cpu.getMem().getLayout()[0x65]).getMaxValue();
-	}
-	
-	private long getTotalShots()
-	{
-		return gui.getTotalBPresses();
+	@Override
+	public void setDeath(long cycle) {
+		//Easier just to handle in progress()
 	}
 }
