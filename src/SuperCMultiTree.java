@@ -38,6 +38,7 @@ public class SuperCMultiTree implements AiAgent {
 	private long numControllerRequests = 5000;
 	
 	private long usedControllerRequests;
+	private long previousCycle;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -159,6 +160,7 @@ public class SuperCMultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = finalScore;
 				break;
 			}
 		}
@@ -346,6 +348,7 @@ public class SuperCMultiTree implements AiAgent {
 	
 	private void setup()
 	{
+		previousCycle = 0;
 		score = 0;
 		done = false;
 		startedDone = false;
@@ -474,7 +477,14 @@ public class SuperCMultiTree implements AiAgent {
 			
 			long level = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x50].read());
 			long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x16].read());
-			score += (level << 32) + (screen << 24);
+			long seconds = (long)((cycle - previousCycle) / 5369317.5);
+			if (seconds > 255)
+			{
+				seconds = 255;
+			}
+			
+			previousCycle = cycle;
+			score += (level << 40) + (screen << 32) + ((255 - seconds) << 24);
 		}
 		
 		cont();

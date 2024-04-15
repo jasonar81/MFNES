@@ -29,6 +29,7 @@ private static final long serialVersionUID = -6732487624928621347L;
 	private transient boolean foundNextKey = false;
 	private int lastSceneNum = 0;
 	private int lastNoImprovementCount = 0;
+	private transient int sceneOrderCounter = 0;
 	
 	public MultiDecisionTree(ArrayList<Integer> validStates, ArrayList<Integer> sceneAddresses, IfElseNode defaultTree, ArrayList<Integer> disallow)
 	{
@@ -72,6 +73,7 @@ private static final long serialVersionUID = -6732487624928621347L;
 		foundNextKey = false;
 		addressesAndValues = null;
 		lastSceneNum = sceneNum;
+		sceneOrderCounter = 0;
 	}
 	
 	public void setRunSceneMode(int sceneNum, int noImprovementCount)
@@ -83,6 +85,7 @@ private static final long serialVersionUID = -6732487624928621347L;
 		addressesAndValues = null;
 		lastSceneNum = sceneNum;
 		lastNoImprovementCount = noImprovementCount;
+		sceneOrderCounter = 0;
 	}
 	
 	public boolean foundNextKey()
@@ -964,11 +967,10 @@ private static final long serialVersionUID = -6732487624928621347L;
 				reindexTree(key);
 			}
 			
-			if (!scenes.contains(key))
+			if (sceneOrder.size() == 0 || !key.equals(sceneOrder.get(sceneOrder.size() - 1)))
 			{
 				sceneOrder.add(key);
-				scenes.add(key);
-				System.out.println("Added to scenes!");
+				System.out.println("Added to scenes! Key = " + key);
 			}
 			
 			return roots.get(key).run(allRam);
@@ -980,12 +982,25 @@ private static final long serialVersionUID = -6732487624928621347L;
 			key.add(allRam[address]);
 		}
 		
-		if (key.equals(sceneOrder.get(sceneNum)))
+		if (sceneOrderCounter < sceneOrder.size() && !key.equals(sceneOrder.get(sceneOrderCounter)))
+		{
+			if (sceneOrder.size() > sceneOrderCounter + 1 && key.equals(sceneOrder.get(sceneOrderCounter + 1)))
+			{
+				sceneOrderCounter++;
+			}
+			else
+			{
+				sceneOrderCounter = sceneOrder.size();
+			}
+		}
+		
+		if (sceneOrderCounter == sceneNum)
 		{
 			if (!trackingEnabled)
 			{
 				reg4016.enableTracking(0);
 				trackingEnabled = true;
+				System.out.println("Tracking enabled key = " + key);
 			}
 		}
 		else if (trackingEnabled)
@@ -994,6 +1009,7 @@ private static final long serialVersionUID = -6732487624928621347L;
 			reg4016.enableTracking(0);
 			trackingEnabled = false;
 			foundNextKey = true;
+			System.out.println("Tracking disabled key = " + key);
 		}
 		
 		IfElseNode tree = roots.get(key);

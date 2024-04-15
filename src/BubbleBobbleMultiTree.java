@@ -140,6 +140,7 @@ public class BubbleBobbleMultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = score;
 				break;
 			}
 		}

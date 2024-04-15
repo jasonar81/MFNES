@@ -52,10 +52,16 @@ public class Megaman2MultiTree implements AiAgent {
 	private static int START = 0x01;
 	
 	private int countWithNoImprovement = 0;
+	private long previousCycle = 0;
+	private static int startSceneNum = 0;
 	
 	public static void main(String[] args)
 	{
 		instance = new Megaman2MultiTree();
+		if (args.length == 1)
+		{
+			startSceneNum = Integer.parseInt(args[0]);
+		}
 		instance.main();
 	}
 	
@@ -143,16 +149,21 @@ public class Megaman2MultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = score;
 				break;
 			}
 		}
 		
 		int sceneNum = tree.getLastSceneNum();
+		if (startSceneNum != 0)
+		{
+			sceneNum = startSceneNum;
+		}
+		
 		countWithNoImprovement = tree.getLastNoImprovementCount();
 		while (true)
 		{
 			//play screen until no deaths 
-			System.out.println("Working on scene " + sceneNum);
 			while (sceneNum >= tree.numScenes())
 			{
 				sceneNum--;
@@ -193,6 +204,7 @@ public class Megaman2MultiTree implements AiAgent {
 	
 	private boolean workOnScene(int sceneNum)
 	{
+		System.out.println("Working on scene " + sceneNum);
 		countWithNoImprovement = 0;
 		while (true)
 		{
@@ -330,6 +342,7 @@ public class Megaman2MultiTree implements AiAgent {
 	
 	private void setup()
 	{
+		previousCycle = 0;
 		previousLives = 0;
 		previousBossHp = 0;
 		previousScreen = 0;
@@ -423,8 +436,8 @@ public class Megaman2MultiTree implements AiAgent {
 	{
 		if (!startedDone && !done)
 		{
-			startedDone = true;
-			score += getScore();
+			score += getScore(false, totalTime);
+			
 			done = true;
 			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
 		}
@@ -455,9 +468,19 @@ public class Megaman2MultiTree implements AiAgent {
 		int lives = cpu.getMem().getLayout()[0xa8].read();
 		int screen = cpu.getMem().getLayout()[0x20].read();
 		int level = cpu.getMem().getLayout()[0x2a].read();
+		
+		if (screen < 0)
+		{
+			cont();
+			return;
+		}
+		
 		if (screen > previousScreen || level != previousLevel)
 		{
-			score += getScore();
+			//System.out.println("Getting score because screen = " + screen + " and previousScreen = " + previousScreen + " and level = " + level + " and previousLevel = " + previousLevel);
+			score += getScore(true, cycle);
+			previousScreen = screen;
+			previousLevel = level;
 		}
 		
 		if (previousBossHp != bossHp)
@@ -481,13 +504,11 @@ public class Megaman2MultiTree implements AiAgent {
 		
 		previousBossHp = bossHp;
 		previousLives = lives;
-		previousScreen = screen;
-		previousLevel = level;
 		
 		cont();
 	}
 	
-	private long getScore()
+	private long getScore(boolean done, long cycle)
 	{
 		long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x20].read());
 		long xPos = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x460].read());
@@ -523,10 +544,14 @@ public class Megaman2MultiTree implements AiAgent {
 			{
 				offset += (256 - yPos);
 			}
-			else if (screen == 4 || screen == 5 || screen == 15 || screen == 16 || screen == 17 ||
+			else if (screen == 4 || screen == 15 || screen == 16 || screen == 17 ||
 					screen == 18 || screen == 19)
 			{
 				offset += yPos;
+			}
+			else if (screen == 5)
+			{
+				offset += (yPos / 4);
 			}
 		}
 		else
@@ -534,6 +559,17 @@ public class Megaman2MultiTree implements AiAgent {
 			offset = xPos;
 		}
 		
-		return (screen << 25) + (bossDamage << 17) + (myHp << 8) + offset;
+		long seconds = (long)((cycle - previousCycle) / 5369317.5);
+		if (seconds > 255)
+		{
+			seconds = 255;
+		}
+		
+		previousCycle = cycle;
+		
+		System.out.println("Screen = " + screen);
+		System.out.println("Offset = " + offset);
+		System.out.println("HP = " + myHp);
+		return (screen << 33) + (bossDamage << 25) + (offset << 16) + (myHp << 8) + (255 - seconds);
 	}
 }

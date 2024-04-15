@@ -185,6 +185,7 @@ public class TimeWasterMultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = finalScore;
 				break;
 			}
 		}

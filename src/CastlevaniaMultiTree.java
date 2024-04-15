@@ -143,6 +143,7 @@ public class CastlevaniaMultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = finalScore;
 				break;
 			}
 		}
@@ -414,7 +415,9 @@ public class CastlevaniaMultiTree implements AiAgent {
 			System.out.println("Done");
 			startedDone = true;
 			++livesLost;
+		
 			score += computeScore();
+			
 			finalScore = score;
 			done = true;
 			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
@@ -446,19 +449,19 @@ public class CastlevaniaMultiTree implements AiAgent {
 		if (screen > previousScreen || stage != previousStage)
 		{
 			score += computeScore();
+			previousStage = stage;
+			previousScreen = screen;
 		}
 		
-		previousStage = stage;
-		previousScreen = screen;
 		cont();
 	}
 	
 	private long gameScore()
 	{
 		long retval = 0;
-		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x7fd].read());
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x42].read());
 		retval += val;
-		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x7fe].read());
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x43].read());
 		retval += val * 256;
 		return retval;
 	}
@@ -482,20 +485,20 @@ public class CastlevaniaMultiTree implements AiAgent {
 		System.out.println("Offset = " + offset);
 		System.out.println("Game score = " + gameScore);
 		
-		long retval = (level << 40) + (hp << 32) + gameScore;
+		long retval = (level << 40) + (hp << 16) + gameScore;
 		
 		if (level == 2 && yPos == (byte)0xc0 && offset <= 264 && offset >= 50 && floor == 1)
 		{
-			offset += (264 - offset);
+			offset = 264 + (264 - offset);
 		} else if (level == 2 && floor == 0 && offset >= 72 && offset <= 457)
 		{
-			offset += 478;
+			offset += 530;
 		} else if (level == 2 && floor == 1 && offset >= 378)
 		{
 			offset += 990;
 		}
 		
-		retval += (offset << 16);
+		retval += (offset << 24);
 		return retval;
 	}
 }

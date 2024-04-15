@@ -164,6 +164,7 @@ public class ContraMultiTree implements AiAgent{
 			}
 			else
 			{
+				highScore = score;
 				break;
 			}
 		}
@@ -465,7 +466,7 @@ public class ContraMultiTree implements AiAgent{
 			}
 			else
 			{
-				long scoreDelta = getGameScore() - previousProgressScore;
+				long scoreDelta = getGameScore();
 				long offset = getScreenOffset();
 				offset *= (256 * 256 * 256);
 				scoreDelta += (256 - Byte.toUnsignedInt(cpu.getMem().getLayout()[0x31a].read()));
@@ -487,8 +488,7 @@ public class ContraMultiTree implements AiAgent{
 		
 		--remainingLives;
 		
-		long scoreDelta = getGameScore() - previousProgressScore;
-		
+		long scoreDelta = getGameScore();
 		long offset = getScreenOffset();
 		
 		possibleScoreIncrement = ((offset << 32) + (scoreDelta << 8));

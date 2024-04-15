@@ -1,18 +1,18 @@
 import java.awt.event.KeyEvent;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 
-public class ArkanoidMultiTree implements AiAgent {
+public class DoubleDragonMultiTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -20,6 +20,8 @@ public class ArkanoidMultiTree implements AiAgent {
 	private Memory ppuMem;
 	private Memory cpuMem;
 	private Thread cpuThread;
+	
+	
 	private GUI gui;
 	private Thread guiThread;
 	private volatile double highScore = 0;
@@ -27,16 +29,19 @@ public class ArkanoidMultiTree implements AiAgent {
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
 	private volatile long score;
-	private volatile long blocks;
+	private volatile long livesLost;
+	private volatile long totalTime;
 	
-	private static ArkanoidMultiTree instance;
+	private static DoubleDragonMultiTree instance;
 	
-	private long firstUsableCycle = 12109347;
+	private long firstUsableCycle = 102186813;
 	private MultiDecisionTree tree;
 	private MultiTreeController controller;
 	private long numControllerRequests = 5000;
 	
 	private long usedControllerRequests;
+	private long previousScreen;
+	private long previousLevel;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -51,7 +56,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	
 	public static void main(String[] args)
 	{
-		instance = new ArkanoidMultiTree();
+		instance = new DoubleDragonMultiTree();
 		instance.main();
 	}
 	
@@ -59,59 +64,43 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		ArrayList<Integer> validStates = new ArrayList<Integer>();
 		validStates.add(0);
+		validStates.add(UP);
+		validStates.add(DOWN);
 		validStates.add(LEFT);
 		validStates.add(RIGHT);
+		validStates.add(UP | A);
+		validStates.add(DOWN | A);
+		validStates.add(LEFT | A);
+		validStates.add(RIGHT | A);
+		validStates.add(UP | B);
+		validStates.add(DOWN | B);
+		validStates.add(LEFT | B);
+		validStates.add(RIGHT | B);
+		validStates.add(UP | A | B);
+		validStates.add(DOWN | A | B);
+		validStates.add(LEFT | A | B);
+		validStates.add(RIGHT | A | B);
 		validStates.add(A);
+		validStates.add(B);
+		validStates.add(A | B);
 		
 		if (!loadTree())
 		{
 			ArrayList<Integer> addresses = new ArrayList<Integer>();
-			addresses.add(0x370);
-			addresses.add(0x371);
+			addresses.add(0x3d);
+			addresses.add(0x62);
 			ArrayList<Integer> disallow = new ArrayList<Integer>();
-			disallow.add(0x0d);
-			
-			IfElseNode root = new IfElseNode();
-			root.terminal = false;
-			root.address = 0x11a;
-			root.address2 = 0x38;
-			root.comparisonType = 7;
-			root.checkValue = 0;
-			
-			IfElseNode left = new IfElseNode();
-			left.terminal = true;
-			left.terminalValue = 0x08;
-			root.left = left;
-			left.parent = root;
-			
-			IfElseNode right = new IfElseNode();
-			right.terminal = false;
-			right.address = 0x38;
-			right.address2 = 0x11f;
-			right.comparisonType = 7;
-			right.checkValue = 0;
-			root.right = right;
-			right.parent = root;
-			
-			IfElseNode rightLeft = new IfElseNode();
-			rightLeft.terminal = true;
-			rightLeft.terminalValue = 0x04;
-			right.left = rightLeft;
-			rightLeft.parent = right;
-			
-			IfElseNode rightRight = new IfElseNode();
-			rightRight.terminal = true;
-			rightRight.terminalValue = 0;
-			right.right = rightRight;
-			rightRight.parent = right;
-			
-			tree = new MultiDecisionTree(validStates, addresses, root, disallow);
+			disallow.add(0x43);
+			IfElseNode defaultTree = new IfElseNode();
+			defaultTree.terminal = true;
+			defaultTree.terminalValue = RIGHT;
+			tree = new MultiDecisionTree(validStates, addresses, defaultTree, disallow);
 		}
 		
 		controller = new MultiTreeController(tree);
 		tree.setValidStates(validStates);
 		setup();
-		load("arkanoid.nes");
+		load("double_dragon.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -122,6 +111,7 @@ public class ArkanoidMultiTree implements AiAgent {
 		
 		while (!done) {}
 		
+		printResults();
 		System.out.println("Score of " + finalScore);
 
 		highScore = finalScore;
@@ -133,7 +123,7 @@ public class ArkanoidMultiTree implements AiAgent {
 		{
 			numControllerRequests = usedControllerRequests * 3;
 			setup();
-			load("arkanoid.nes");
+			load("double_dragon.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -144,6 +134,7 @@ public class ArkanoidMultiTree implements AiAgent {
 			
 			while (!done) {}
 			
+			printResults();
 			System.out.println("Score of " + finalScore);
 	
 			teardown();
@@ -184,7 +175,7 @@ public class ArkanoidMultiTree implements AiAgent {
 			//play all
 			numControllerRequests *= 2;
 			setup();
-			load("arkanoid.nes");
+			load("double_dragon.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -210,7 +201,7 @@ public class ArkanoidMultiTree implements AiAgent {
 		while (true)
 		{
 			setup();
-			load("arkanoid.nes");
+			load("double_dragon.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -270,7 +261,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		double minHighScore = finalScore;
 		setup();
-		load("arkanoid.nes");
+		load("double_dragon.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -298,7 +289,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("arkanoid_scenes.tree");
+			File file = new File("double_dragon_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -325,7 +316,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("arkanoid_scenes.tree");
+			File file = new File("double_dragon_scenes.tree");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -343,15 +334,20 @@ public class ArkanoidMultiTree implements AiAgent {
 	
 	private void setup()
 	{
-		blocks = 0;
+		previousScreen = 0;
+		previousLevel = 0;
+		livesLost = 0;
 		score = 0;
+		totalTime = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {11333218, 12109346};
+		long[] startOnOffTimes = new long[] {14972530, 16019792};
 		clock = new Clock();
 		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
+		long[] selectTimes = new long[] {10709822, 11276049};
+		((MultiTreeGui)gui).setSelectTimes(selectTimes);
 		guiThread.setPriority(10);
 		guiThread.start();
 		
@@ -370,7 +366,9 @@ public class ArkanoidMultiTree implements AiAgent {
 	
 	private void teardown()
 	{
+		
 		cpu.terminate();
+		
 		gui.terminate();
 		
 		try
@@ -380,13 +378,13 @@ public class ArkanoidMultiTree implements AiAgent {
 		catch(Exception e) {}
 	}
 
-	private void load(String filename)
+	private void load(String filename, String saveFilename)
 	{
 		Cartridge cart = Cartridge.loadCart(filename);
 		
 		if (cart != null)
 		{
-			cpu.setupCart(cart);
+			cpu.setupCart(cart, saveFilename);
 			ppu.setupCart(cart);
 		}
 	}
@@ -395,13 +393,26 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
+		
+	}
+	
+	private void printResults()
+	{
+		System.out.println("Game score = " + gameScore());
 	}
 	
 	private void on()
 	{
+		
+		
 		cpuThread = new Thread(cpu);
 		cpuThread.setPriority(10);
+		
+		
 		cpu.debugHold(true);
+		
+		
+		
 		cpuThread.start();
 	}
 	
@@ -409,7 +420,8 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x0d] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x43] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x62] = new NotifyChangesPort(this, clock); //screen
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -420,8 +432,9 @@ public class ArkanoidMultiTree implements AiAgent {
 			pause();
 			System.out.println("Done");
 			startedDone = true;
-			score = gameScore();
-			System.out.println("Game score = " + score);
+			this.totalTime = totalTime;
+			++livesLost;
+			score += gameScore();
 			finalScore = score;
 			done = true;
 			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
@@ -431,11 +444,13 @@ public class ArkanoidMultiTree implements AiAgent {
 	private void pause()
 	{
 		cpu.debugHold(true);
+		
 	}
 	
 	private void cont()
 	{
 		cpu.debugHold(false);
+		
 	}
 	
 	public synchronized void progress(long cycle)
@@ -444,25 +459,44 @@ public class ArkanoidMultiTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x0d].read() == 2)
+			if (cpu.getMem().getLayout()[0x43].read() == (byte)1)
 			{
 				setDone(cycle);
 				return;
+			}
+			
+			long level = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x3d].read());
+			long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x62].read());
+			if (level != previousLevel || screen > previousScreen)
+			{
+				previousLevel = level;
+				previousScreen = screen;
+				score += fullScore(cycle);
 			}
 		}
 		
 		cont();
 	}
 	
+	private long fullScore(long cycle)
+	{
+		long level = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x3d].read());
+		long screen = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x62].read());
+		long health = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x3b4].read());
+		long time = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x505].read());
+		return gameScore() + (time << 24) + (health << 32) + (screen << 40) + (level << 48);
+	}
+	
 	private long gameScore()
 	{
 		long retval = 0;
-		retval += cpu.getMem().getLayout()[0x0375].read();
-		retval += cpu.getMem().getLayout()[0x0374].read() * 10;
-		retval += cpu.getMem().getLayout()[0x0373].read() * 100;
-		retval += cpu.getMem().getLayout()[0x0372].read() * 1000;
-		retval += cpu.getMem().getLayout()[0x0371].read() * 10000;
-		retval += cpu.getMem().getLayout()[0x0370].read() * 100000;
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x44].read());
+		retval += val;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x45].read());
+		retval += val * 256;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x46].read());
+		retval += val * 256 * 256;
+		
 		return retval;
 	}
 	

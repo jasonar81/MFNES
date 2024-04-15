@@ -344,9 +344,9 @@ private static final long serialVersionUID = -6732487624928621347L;
 			}
 		}
 		
-		//layout[0x459] = new MonitorMemoryPort(0x459);
-		//layout[0x45a] = new MonitorMemoryPort(0x45a);
-		//layout[0x45b] = new MonitorMemoryPort(0x45b);
+		//layout[0x98] = new MonitorMemoryPort(0x98);
+		//layout[0x47] = new MonitorMemoryPort(0x47);
+		//layout[0x624] = new MonitorMemoryPort(0x624);
 	}
 	
 	private void mapper0()

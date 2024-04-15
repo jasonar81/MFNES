@@ -151,6 +151,7 @@ public class SmbMultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = score;
 				break;
 			}
 		}

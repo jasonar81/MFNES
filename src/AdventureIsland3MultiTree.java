@@ -12,7 +12,7 @@ import java.io.FileOutputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 
-public class ArkanoidMultiTree implements AiAgent {
+public class AdventureIsland3MultiTree implements AiAgent {
 	private Clock clock;
 	private CPU cpu;
 	private PPU ppu;
@@ -27,16 +27,18 @@ public class ArkanoidMultiTree implements AiAgent {
 	private volatile boolean done = false;
 	private volatile boolean startedDone;
 	private volatile long score;
-	private volatile long blocks;
+	private volatile long livesLost;
+	private static HashSet<Integer> levels = new HashSet<Integer>();
 	
-	private static ArkanoidMultiTree instance;
+	private static AdventureIsland3MultiTree instance;
 	
-	private long firstUsableCycle = 12109347;
+	private long firstUsableCycle = 42326988;
 	private MultiDecisionTree tree;
 	private MultiTreeController controller;
 	private long numControllerRequests = 5000;
 	
 	private long usedControllerRequests;
+	private long previousCycle;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -51,7 +53,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	
 	public static void main(String[] args)
 	{
-		instance = new ArkanoidMultiTree();
+		instance = new AdventureIsland3MultiTree();
 		instance.main();
 	}
 	
@@ -59,59 +61,44 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		ArrayList<Integer> validStates = new ArrayList<Integer>();
 		validStates.add(0);
+		validStates.add(UP);
+		validStates.add(DOWN);
 		validStates.add(LEFT);
 		validStates.add(RIGHT);
+		validStates.add(UP | A);
+		validStates.add(DOWN | A);
+		validStates.add(LEFT | A);
+		validStates.add(RIGHT | A);
+		validStates.add(UP | B);
+		validStates.add(DOWN | B);
+		validStates.add(LEFT | B);
+		validStates.add(RIGHT | B);
+		validStates.add(UP | A | B);
+		validStates.add(DOWN | A | B);
+		validStates.add(LEFT | A | B);
+		validStates.add(RIGHT | A | B);
 		validStates.add(A);
-		
+		validStates.add(B);
+		validStates.add(A | B);
+		validStates.add(START);
 		if (!loadTree())
 		{
 			ArrayList<Integer> addresses = new ArrayList<Integer>();
-			addresses.add(0x370);
-			addresses.add(0x371);
+			addresses.add(0xd0);
+			addresses.add(0xd1);
+			addresses.add(0xb3);
 			ArrayList<Integer> disallow = new ArrayList<Integer>();
-			disallow.add(0x0d);
-			
-			IfElseNode root = new IfElseNode();
-			root.terminal = false;
-			root.address = 0x11a;
-			root.address2 = 0x38;
-			root.comparisonType = 7;
-			root.checkValue = 0;
-			
-			IfElseNode left = new IfElseNode();
-			left.terminal = true;
-			left.terminalValue = 0x08;
-			root.left = left;
-			left.parent = root;
-			
-			IfElseNode right = new IfElseNode();
-			right.terminal = false;
-			right.address = 0x38;
-			right.address2 = 0x11f;
-			right.comparisonType = 7;
-			right.checkValue = 0;
-			root.right = right;
-			right.parent = root;
-			
-			IfElseNode rightLeft = new IfElseNode();
-			rightLeft.terminal = true;
-			rightLeft.terminalValue = 0x04;
-			right.left = rightLeft;
-			rightLeft.parent = right;
-			
-			IfElseNode rightRight = new IfElseNode();
-			rightRight.terminal = true;
-			rightRight.terminalValue = 0;
-			right.right = rightRight;
-			rightRight.parent = right;
-			
-			tree = new MultiDecisionTree(validStates, addresses, root, disallow);
+			disallow.add(0x394);
+			IfElseNode defaultTree = new IfElseNode();
+			defaultTree.terminal = true;
+			defaultTree.terminalValue = RIGHT;
+			tree = new MultiDecisionTree(validStates, addresses, defaultTree, disallow);
 		}
 		
 		controller = new MultiTreeController(tree);
 		tree.setValidStates(validStates);
 		setup();
-		load("arkanoid.nes");
+		load("adventure_island3.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -122,6 +109,7 @@ public class ArkanoidMultiTree implements AiAgent {
 		
 		while (!done) {}
 		
+		printResults();
 		System.out.println("Score of " + finalScore);
 
 		highScore = finalScore;
@@ -133,7 +121,7 @@ public class ArkanoidMultiTree implements AiAgent {
 		{
 			numControllerRequests = usedControllerRequests * 3;
 			setup();
-			load("arkanoid.nes");
+			load("adventure_island3.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -144,6 +132,7 @@ public class ArkanoidMultiTree implements AiAgent {
 			
 			while (!done) {}
 			
+			printResults();
 			System.out.println("Score of " + finalScore);
 	
 			teardown();
@@ -184,7 +173,7 @@ public class ArkanoidMultiTree implements AiAgent {
 			//play all
 			numControllerRequests *= 2;
 			setup();
-			load("arkanoid.nes");
+			load("adventure_island3.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -210,7 +199,7 @@ public class ArkanoidMultiTree implements AiAgent {
 		while (true)
 		{
 			setup();
-			load("arkanoid.nes");
+			load("adventure_island3.nes", "sav");
 			makeModifications();
 			controller.reset();
 			controller.setCpuMem(cpuMem);
@@ -270,7 +259,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		double minHighScore = finalScore;
 		setup();
-		load("arkanoid.nes");
+		load("adventure_island3.nes", "sav");
 		makeModifications();
 		controller.reset();
 		controller.setCpuMem(cpuMem);
@@ -298,7 +287,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("arkanoid_scenes.tree");
+			File file = new File("adventure_island3_scenes.tree");
 			if (!file.exists())
 			{
 				return false;
@@ -325,7 +314,7 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		try
 		{
-			File file = new File("arkanoid_scenes.tree");
+			File file = new File("adventure_island3_scenes.tree");
 			FileOutputStream f = new FileOutputStream(file);
 			ObjectOutputStream o = new ObjectOutputStream(f);
 	
@@ -343,12 +332,13 @@ public class ArkanoidMultiTree implements AiAgent {
 	
 	private void setup()
 	{
-		blocks = 0;
+		livesLost = 0;
 		score = 0;
 		done = false;
 		startedDone = false;
 		
-		long[] startOnOffTimes = new long[] {11333218, 12109346};
+		long[] startOnOffTimes = new long[] {14926749, 15876563, 21252721, 22065701, 31540991,
+				32753013, 41099303, 42326987};
 		clock = new Clock();
 		gui = new MultiTreeGui(numControllerRequests, firstUsableCycle, controller, startOnOffTimes, clock);
 		guiThread = new Thread(gui);
@@ -380,13 +370,13 @@ public class ArkanoidMultiTree implements AiAgent {
 		catch(Exception e) {}
 	}
 
-	private void load(String filename)
+	private void load(String filename, String saveFilename)
 	{
 		Cartridge cart = Cartridge.loadCart(filename);
 		
 		if (cart != null)
 		{
-			cpu.setupCart(cart);
+			cpu.setupCart(cart, saveFilename);
 			ppu.setupCart(cart);
 		}
 	}
@@ -395,6 +385,11 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		on();
 		cpu.debugHold(false);
+	}
+	
+	private void printResults()
+	{
+		System.out.println("Game score = " + gameScore());
 	}
 	
 	private void on()
@@ -409,7 +404,9 @@ public class ArkanoidMultiTree implements AiAgent {
 	{
 		gui.setAgent(this);
 		Clock.periodNanos = 1.0;
-		cpu.getMem().getLayout()[0x0d] = new NotifyChangesPort(this, clock); //Lives remaining
+		//cpu.getMem().getLayout()[0x394] = new NotifyChangesPort(this, clock); //Lives remaining
+		cpu.getMem().getLayout()[0x76] = new NotifyChangesPort(this, clock); //dying status
+		cpu.getMem().getLayout()[0xb3] = new NotifyChangesPort(this, clock); 
 		((Register4016)cpu.getMem().getLayout()[0x4016]).enableTracking(firstUsableCycle);
 	}
 	
@@ -420,8 +417,8 @@ public class ArkanoidMultiTree implements AiAgent {
 			pause();
 			System.out.println("Done");
 			startedDone = true;
-			score = gameScore();
-			System.out.println("Game score = " + score);
+			++livesLost;
+			score += gameScore();
 			finalScore = score;
 			done = true;
 			usedControllerRequests = ((MultiTreeGui)gui).getRequests();
@@ -444,7 +441,18 @@ public class ArkanoidMultiTree implements AiAgent {
 		
 		if (cycle >= firstUsableCycle)
 		{
-			if (cpu.getMem().getLayout()[0x0d].read() == 2)
+			int world = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xd0].read());
+			int level = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xd1].read());
+			int offset = Byte.toUnsignedInt(cpu.getMem().getLayout()[0xb3].read());
+			int flag = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x99].read());
+			level += (world << 8) + (offset << 16) + (flag << 24);
+			
+			if (levels.add(level))
+			{
+				score += fullScore(cycle);
+			}
+			
+			if (cpu.getMem().getLayout()[0x76].read() == 1)
 			{
 				setDone(cycle);
 				return;
@@ -454,15 +462,29 @@ public class ArkanoidMultiTree implements AiAgent {
 		cont();
 	}
 	
+	private long fullScore(long cycle)
+	{
+		long life = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x390].read());
+		long seconds = (long)((cycle - previousCycle) / 5369317.5);
+		if (seconds > 255)
+		{
+			seconds = 255;
+		}
+		
+		previousCycle = cycle;
+		
+		return (levels.size() << 40) + (life << 32) + ((255 - seconds) << 24) + gameScore();
+	}
+	
 	private long gameScore()
 	{
 		long retval = 0;
-		retval += cpu.getMem().getLayout()[0x0375].read();
-		retval += cpu.getMem().getLayout()[0x0374].read() * 10;
-		retval += cpu.getMem().getLayout()[0x0373].read() * 100;
-		retval += cpu.getMem().getLayout()[0x0372].read() * 1000;
-		retval += cpu.getMem().getLayout()[0x0371].read() * 10000;
-		retval += cpu.getMem().getLayout()[0x0370].read() * 100000;
+		int val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x391].read());
+		retval += val;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x392].read());
+		retval += val * 256;
+		val = Byte.toUnsignedInt(cpu.getMem().getLayout()[0x393].read());
+		retval += val * 256 * 256;
 		return retval;
 	}
 	

@@ -136,6 +136,7 @@ public class AdventureIslandMultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = finalScore;
 				break;
 			}
 		}
@@ -437,8 +438,8 @@ public class AdventureIslandMultiTree implements AiAgent {
 				return;
 			}
 			
-			long level = cpu.getMem().getLayout()[0x39].read() + cpu.getMem().getLayout()[0x38].read() * 4 + cpu.getMem().getLayout()[0x37].read() * 16;
-			long health =Byte.toUnsignedLong(cpu.getMem().getLayout()[0x76].read());
+			long level = cpu.getMem().getLayout()[0x39].read() + cpu.getMem().getLayout()[0x38].read() * 5 + cpu.getMem().getLayout()[0x37].read() * 20;
+			long health = Byte.toUnsignedLong(cpu.getMem().getLayout()[0x76].read());
 			
 			if (level > 0)
 			{

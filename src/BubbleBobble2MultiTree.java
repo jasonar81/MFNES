@@ -37,6 +37,7 @@ public class BubbleBobble2MultiTree implements AiAgent {
 	private long numControllerRequests = 10000;
 	
 	private long usedControllerRequests;
+	private long previousCycle;
 	
 	private static int A = 0x80;
 	private static int B = 0x40;
@@ -132,6 +133,7 @@ public class BubbleBobble2MultiTree implements AiAgent {
 			}
 			else
 			{
+				highScore = finalScore;
 				break;
 			}
 		}
@@ -319,6 +321,7 @@ public class BubbleBobble2MultiTree implements AiAgent {
 	
 	private void setup()
 	{
+		previousCycle = 0;
 		livesLost = 0;
 		score = 0;
 		done = false;
@@ -435,7 +438,14 @@ public class BubbleBobble2MultiTree implements AiAgent {
 				return;
 			}
 			
-			score += gameScore();
+			long seconds = (long)((cycle - previousCycle) / 5369317.5);
+			if (seconds > 255)
+			{
+				seconds = 255;
+			}
+			
+			previousCycle = cycle;
+			score += ((255 - seconds) << 17) + gameScore();
 		}
 		
 		cont();
